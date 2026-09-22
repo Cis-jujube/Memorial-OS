@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EntryAnalysisV2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "items",
+    "unprocessed_quotes"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": [
+        "2.0"
+      ]
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "subject",
+          "text",
+          "source_quote",
+          "evidence_mode",
+          "time_text",
+          "scope_text",
+          "clarification"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "fact",
+              "preference",
+              "experience",
+              "goal",
+              "plan",
+              "note"
+            ]
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "source_quote": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_mode": {
+            "type": "string",
+            "enum": [
+              "direct",
+              "reported",
+              "uncertain",
+              "hypothetical"
+            ]
+          },
+          "time_text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scope_text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "clarification": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "unprocessed_quotes": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RecallAnswerV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "statements",
+    "suggestions",
+    "missing_info",
+    "clarification",
+    "next_step"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": [
+        "1.0"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "found",
+        "partial",
+        "not_found",
+        "needs_clarification"
+      ]
+    },
+    "statements": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "statement_type",
+          "source_ids"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "statement_type": {
+            "type": "string",
+            "enum": [
+              "recorded",
+              "summary"
+            ]
+          },
+          "source_ids": {
+            "type": "array",
+            "maxItems": 8,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "suggestions": {
+      "type": "array",
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "basis",
+          "source_ids"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "personalized",
+              "general"
+            ]
+          },
+          "source_ids": {
+            "type": "array",
+            "maxItems": 8,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "missing_info": {
+      "type": "array",
+      "maxItems": 4,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "clarification": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "next_step": {
+      "type": "string",
+      "enum": [
+        "none",
+        "clarify",
+        "lookup_current_information",
+        "open_outing_editor"
+      ]
+    }
+  }
+}

@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActionDraftV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "draft_id",
+    "draft_revision",
+    "source_entry_id",
+    "source_revision",
+    "operation",
+    "target_id",
+    "expected_target_revision",
+    "evidence_quote",
+    "proposal_id",
+    "proposal_revision",
+    "payload"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": [
+        "1.0"
+      ]
+    },
+    "draft_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "draft_revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "source_entry_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source_revision": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "operation": {
+      "type": "string",
+      "enum": [
+        "create",
+        "update",
+        "cancel"
+      ]
+    },
+    "target_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "expected_target_revision": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "evidence_quote": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "proposal_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "proposal_revision": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 1
+    },
+    "payload": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "start_at",
+        "end_at",
+        "time_zone",
+        "location_name",
+        "participant_ids",
+        "estimated_total_cost",
+        "notes",
+        "remind_at"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "start_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "end_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "time_zone": {
+          "type": "string",
+          "minLength": 1
+        },
+        "location_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "participant_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "estimated_total_cost": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "notes": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "remind_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

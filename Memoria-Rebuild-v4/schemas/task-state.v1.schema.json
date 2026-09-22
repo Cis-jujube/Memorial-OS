@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "TaskStateV1",
+  "description": "Application-owned state; never produced by a model. id is the task_id.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source_id",
+    "input_revision",
+    "request_id",
+    "phase",
+    "started_at",
+    "updated_at",
+    "unprocessed"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input_revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "waiting_model",
+        "validating",
+        "awaiting_review",
+        "no_suggestions",
+        "failed",
+        "cancelled",
+        "interrupted"
+      ]
+    },
+    "started_at": {
+      "type": "number"
+    },
+    "updated_at": {
+      "type": "number"
+    },
+    "error": {
+      "type": "string"
+    },
+    "unprocessed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "decisionStatus": {
+      "type": "string"
+    },
+    "chunks": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}
