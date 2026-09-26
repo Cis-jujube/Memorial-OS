@@ -4,6 +4,8 @@
 
 - OpenAI 工具调用：https://developers.openai.com/api/docs/guides/function-calling
 - DeepSeek JSON 输出：https://api-docs.deepseek.com/guides/json_mode/
+- DeepSeek 当前模型名称：https://api-docs.deepseek.com/updates/
+- DeepSeek 思考强度参数：https://api-docs.deepseek.com/guides/thinking_mode/
 - Claude 客户端工具定义：https://platform.claude.com/docs/en/agents-and-tools/tool-use/define-tools
 - Gemini 原生函数调用：https://ai.google.dev/gemini-api/docs/function-calling
 - Grok 工具调用：https://docs.x.ai/developers/tools/function-calling

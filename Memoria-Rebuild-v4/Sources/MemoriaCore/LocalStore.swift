@@ -1,6 +1,26 @@
 import Foundation
 
 public actor LocalStore {
+  private static func quotedFirstPerson(in source: String, evidence: String) -> Bool {
+    guard let evidenceRange = source.range(of: evidence) else { return false }
+    let pairs: [(Character, Character)] = [
+      ("“", "”"), ("‘", "’"), ("「", "」"), ("『", "』"), ("\"", "\""), ("'", "'"),
+    ]
+    for (opening, closing) in pairs {
+      var cursor = source.startIndex
+      while cursor < source.endIndex,
+        let start = source[cursor...].firstIndex(of: opening),
+        let end = source[source.index(after: start)...].firstIndex(of: closing)
+      {
+        let quotedRange = source.index(after: start)..<end
+        if quotedRange.overlaps(evidenceRange) && source[quotedRange].contains("我") {
+          return true
+        }
+        cursor = source.index(after: end)
+      }
+    }
+    return false
+  }
   private var state: LibraryState
   public let url: URL
   private let writer: (Data, URL) throws -> Void
@@ -269,6 +289,12 @@ public actor LocalStore {
         if item.evidence_mode == .uncertain || item.evidence_mode == .hypothetical {
           issue = issue ?? "请保留推测或条件，并人工审阅"
         }
+        if item.subject == "我"
+          && (item.evidence_mode == .reported
+            || Self.quotedFirstPerson(in: source.text, evidence: item.source_quote))
+        {
+          issue = "请确认转述中的“我”指谁"
+        }
         if blocked { issue = "语义判断未通过，请人工核对并修改" }
         if s.activeMemories.contains(where: { $0.personID == person && $0.item.text == item.text })
         {
@@ -333,16 +359,27 @@ public actor LocalStore {
       return p
     }
   }
-  public func editProposal(_ proposal: Proposal, expected: Int) throws {
+  public func editProposal(
+    _ proposal: Proposal, expected: Int, confirmedQuotedSelf: Bool = false
+  ) throws {
     try transaction { s in
       guard
         let i = s.proposals.firstIndex(where: { $0.id == proposal.id && $0.status == .pending }),
-        s.proposals[i].revision == expected
+        s.proposals[i].revision == expected,
+        let source = s.entries.first(where: {
+          $0.id == proposal.sourceID && $0.revision == proposal.sourceRevision && !$0.deleted
+        })
       else { throw MemoriaError.stale }
       var p = proposal
       p.revision += 1
       p.edited = true
       p.issue = nil
+      if p.item.subject == "我" && !confirmedQuotedSelf
+        && (p.item.evidence_mode == .reported
+          || Self.quotedFirstPerson(in: source.text, evidence: p.item.source_quote))
+      {
+        p.issue = "请确认转述中的“我”指谁"
+      }
       s.proposals[i] = p
     }
   }

@@ -288,6 +288,14 @@ struct ProposalCard: View {
       }
       if editing {
         TextField(L("记忆内容"), text: $value).textFieldStyle(WarmFieldStyle())
+        if proposal.issue == "请确认转述中的“我”指谁" {
+          Text(
+            L(
+              "请重新选择引语中的“我”是谁；只有你自己说的原话才选择“自己”。",
+              "Choose who said 'I' in the quote. Select Myself only if you said it."
+            )
+          ).font(TypeScale.body).foregroundStyle(accent)
+        }
         if proposal.personID == nil && proposal.item.subject != "我" {
           Picker(L("关联人物", "Person"), selection: $person) {
             Text(L("请明确选择人物", "Choose a person")).tag("__choose")
@@ -295,7 +303,8 @@ struct ProposalCard: View {
             ForEach(model.state.people) { Text($0.name).tag($0.id) }
           }
         } else {
-          PersonPicker(selection: $person)
+          PersonPicker(
+            selection: $person, requireExplicit: proposal.issue == "请确认转述中的“我”指谁")
         }
         Picker(L("替换旧记忆（可选）"), selection: $replacement) {
           Text(L("新增记忆")).tag("")
@@ -314,7 +323,12 @@ struct ProposalCard: View {
             p.item.subject = model.state.people.first { $0.id == person }?.name ?? "我"
             p.replacementID = replacement.nilIfEmpty
             p.replacementRevision = model.state.memories.first { $0.id == replacement }?.revision
-            model.perform { try await $0.editProposal(p, expected: proposal.revision) }
+            let confirmedQuotedSelf = proposal.issue == "请确认转述中的“我”指谁" && person == ""
+            model.perform {
+              try await $0.editProposal(
+                p, expected: proposal.revision,
+                confirmedQuotedSelf: confirmedQuotedSelf)
+            }
             editing = false
           }.disabled(value.isEmpty || person == "__choose")
         }
@@ -332,7 +346,9 @@ struct ProposalCard: View {
           Button(L("修改")) {
             value = proposal.item.text
             person =
-              proposal.personID ?? (proposal.item.subject == "我" ? "" : "__choose")
+              proposal.issue == "请确认转述中的“我”指谁"
+              ? "__choose"
+              : proposal.personID ?? (proposal.item.subject == "我" ? "" : "__choose")
             replacement = proposal.replacementID ?? ""
             editing = true
           }

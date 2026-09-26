@@ -266,6 +266,7 @@
   "请明确关联人物或选择自己": "Choose a person or select yourself",
   "原文有重复依据，请人工核对": "Repeated source text. Please review manually.",
   "请保留推测或条件，并人工审阅": "Keep uncertainty or conditions and review manually",
+  "请确认转述中的“我”指谁": "Check who 'I' refers to in the quoted account",
   "语义判断未通过，请人工核对并修改": "Semantic check needs attention. Review and edit manually.",
   "已有相同记忆，请忽略或明确选择替换": "An identical memory exists. Ignore this or choose a replacement.",
   "已有相关资料，请核对是新增信息还是替换旧记忆": "Related memories exist. Decide whether to add or replace.",

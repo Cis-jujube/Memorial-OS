@@ -197,6 +197,59 @@ final class TaskLifecycleTests {
     let s = await store.snapshot()
     expectEqual(s.memories.count, 1)
   }
+  @Test func reportedFirstPersonNeedsReviewBeforeConfirmation() async throws {
+    let cases = [
+      ("小林说：“我不喜欢咖啡。”", "我不喜欢咖啡"),
+      ("小林说：“昨晚我没睡好。”", "我没睡好"),
+      ("小林说：“ 昨晚我没睡好。”", "我没睡好"),
+    ]
+    for (text, quote) in cases {
+      for evidence in [Evidence.reported, .direct] {
+        let store = try temporaryStore()
+        let source = try await store.capture(Entry(text: text), operationID: uid())
+        let task = try await store.begin(source.id)
+        let analysis = EntryAnalysis(items: [
+          EntryItem(subject: "我", text: quote, source_quote: quote, evidence_mode: evidence)
+        ])
+        try await store.install(analysis, task: task)
+        let proposal = await store.snapshot().proposals.first!
+        expectEqual(proposal.issue, "请确认转述中的“我”指谁")
+        do {
+          _ = try await store.confirm(proposal.id, revision: proposal.revision)
+          failTest("quoted first person entered self memory without review")
+        } catch {}
+        try await store.editProposal(proposal, expected: proposal.revision)
+        let stillUnresolved = await store.snapshot().proposals.first!
+        expectEqual(stillUnresolved.issue, "请确认转述中的“我”指谁")
+        do {
+          _ = try await store.confirm(stillUnresolved.id, revision: stillUnresolved.revision)
+          failTest("unchanged edit cleared quoted attribution review")
+        } catch {}
+        expectTrue(await store.snapshot().activeMemories.isEmpty)
+      }
+    }
+  }
+  @Test func quoteReviewOnlyFlagsMatchingEvidenceAndAllowsExplicitSelfChoice() async throws {
+    let store = try temporaryStore()
+    let source = try await store.capture(
+      Entry(text: "小林说：“我喜欢茶。”我喜欢咖啡。"), operationID: uid())
+    let task = try await store.begin(source.id)
+    let analysis = EntryAnalysis(items: [
+      EntryItem(subject: "我", text: "我喜欢茶", source_quote: "我喜欢茶", evidence_mode: .direct),
+      EntryItem(subject: "我", text: "我喜欢咖啡", source_quote: "我喜欢咖啡", evidence_mode: .direct),
+    ])
+    try await store.install(analysis, task: task)
+    let proposals = await store.snapshot().proposals
+    let quoted = proposals.first { $0.item.source_quote == "我喜欢茶" }!
+    let own = proposals.first { $0.item.source_quote == "我喜欢咖啡" }!
+    expectEqual(quoted.issue, "请确认转述中的“我”指谁")
+    expectNil(own.issue)
+    try await store.editProposal(quoted, expected: quoted.revision, confirmedQuotedSelf: true)
+    let reviewed = await store.snapshot().proposals.first { $0.id == quoted.id }!
+    expectNil(reviewed.issue)
+    _ = try await store.confirm(reviewed.id, revision: reviewed.revision)
+    expectEqual(await store.snapshot().activeMemories.count, 1)
+  }
 }
 final class MemoryRetrievalTests {
   @Test func testScopedRetrievalAndCorrection() async throws {
@@ -246,6 +299,30 @@ final class RecallAnswerTests {
   }
 }
 final class ProviderContractTests {
+  @Test func defaultDeepSeekModelUsesCurrentFlashName() {
+    expectEqual(Provider.deepseek.suggestedModel, "deepseek-flash")
+    expectEqual(ProviderConfig().model, "deepseek-flash")
+  }
+  @Test func deepSeekExtractionUsesLowEffortWithoutChangingLegacyAlias() throws {
+    let schema = try Contract.schema("entry-analysis.v2")
+    let flash = ModelClient(config: ProviderConfig(), key: "synthetic-key")
+    let request = try flash.request(
+      system: "json", messages: [flash.user("synthetic")], schema: schema,
+      deepseekLowEffort: true)
+    let body = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
+    expectEqual(body["reasoning_effort"] as? String, "low")
+    expectEqual((body["thinking"] as? [String: String])?["type"], "enabled")
+
+    var legacy = ProviderConfig()
+    legacy.model = "deepseek-chat"
+    let old = ModelClient(config: legacy, key: "synthetic-key")
+    let oldRequest = try old.request(
+      system: "json", messages: [old.user("synthetic")], schema: schema,
+      deepseekLowEffort: true)
+    let oldBody = try JSONSerialization.jsonObject(with: oldRequest.httpBody!) as! [String: Any]
+    expectNil(oldBody["thinking"])
+    expectNil(oldBody["reasoning_effort"])
+  }
   func client(_ provider: Provider) -> ModelClient {
     var c = ProviderConfig()
     c.provider = provider
