@@ -1,8 +1,8 @@
 {
   "date": "2026-09-26",
-  "scope": "Isolated --review-session library; synthetic text only; no real WeChat access",
+  "scope": "Synthetic --review-session functional flows plus read-only local UI checks; no real WeChat access or personal-data mutation",
   "checks": [
-    "74 Swift tests in 17 suites passed with ./scripts/test.sh",
+    "76 Swift tests in 17 suites passed with ./scripts/test.sh",
     "Final build and ad hoc signature verification passed with ./scripts/build-and-run.sh --build-only",
     "Runtime: English sidebar includes Capture, Review desk, Ask, People, Outings, Import, Settings",
     "Runtime: switching Chinese/English updates navigation, controls and date immediately; query text retained",
@@ -28,7 +28,16 @@
     "Regression: unreadable library retains original bytes when restored from validated backup; archiving creates a restorable full copy before an empty new library",
     "Runtime: partial manual confirmation remains in Unorganized; explicit whole-original review clears the queue",
     "Runtime: unknown-person clarification offers Add a person",
-    "Runtime: manual organization opens with a blank memory field and explicit subject choice; Save is disabled until both are set"
+    "Runtime: manual organization opens with a blank memory field and explicit subject choice; Save is disabled until both are set",
+    "Runtime: final English Review desk shows a distinct workload badge and counts for To review, Needs attention and Unorganized; capture picker says No person assigned",
+    "Runtime: model settings show persistent Model ID and API Key labels beside their populated fields",
+    "Regression: short English named-person questions such as Charlie birthday? clarify instead of reading the selected person's memory",
+    "Runtime: English Capture, Review desk and People show distinct no-match messages when search filters exclude existing records; filter text can be cleared without changing stored data",
+    "Source review: outing empty state follows the visible active list",
+    "Runtime: public MapKit query returned six places and Open-Meteo returned the first and explicitly selected second place forecasts; selected row and expanded receipt showed matching place, forecast date and source URL",
+    "Regression: selected second-place weather uses its coordinates and chosen date; unknown place ID fails before network access; upcoming outings and drafts appear before past outings",
+    "Source review: invalid outing budgets now explain disabled lookup actions in both languages; trimmed valid values retain their budget in lookup and drafts",
+    "Regression: reopening a library with an already interrupted task does not rewrite unchanged storage; Will as an English auxiliary before a named contact does not trigger a false person conflict"
   ],
   "limitations": [
     "CUA screenshot captures only distorted 130-160px window thumbnail; full pixel-layout and animation quality unverified. AX actions/readback usable.",

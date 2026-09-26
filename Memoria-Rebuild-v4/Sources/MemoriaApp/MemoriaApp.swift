@@ -169,6 +169,14 @@ struct RootView: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Namespace private var navigation
   let pages = ["记录", "整理台", "问一问", "人物", "行程", "导入", "设置"]
+  var reviewWorkCount: Int {
+    let proposalSources = model.state.proposals.filter { $0.status == .pending }.map(\.sourceID)
+    let unfinishedSources = model.state.entries.filter {
+      ReviewQueue.needsAttention($0, in: model.state)
+        || ReviewQueue.isUnorganized($0, in: model.state)
+    }.map(\.id)
+    return Set(proposalSources + unfinishedSources).count
+  }
   var body: some View {
     HStack(spacing: 0) {
       VStack(alignment: .leading, spacing: 24) {
@@ -186,11 +194,13 @@ struct RootView: View {
                 }
               } label: {
                 HStack {
-                  Text(L(name)).font(TypeScale.body.weight(model.page == name ? .semibold : .regular))
+                  Text(L(name)).font(
+                    TypeScale.body.weight(model.page == name ? .semibold : .regular))
                   Spacer()
                   if name == "整理台" {
-                    let count = model.state.proposals.filter { $0.status == .pending }.count
-                    if count > 0 { Text("\(count)").contentTransition(.numericText()) }
+                    if reviewWorkCount > 0 {
+                      Text("\(reviewWorkCount)").contentTransition(.numericText())
+                    }
                   }
                 }.padding(.horizontal, 20).padding(.vertical, 17)
                   .foregroundStyle(model.page == name ? Color.white : ink.opacity(0.74))
@@ -307,7 +317,7 @@ struct PersonPicker: View {
         if requireExplicit {
           Text(L("请选择归属", "Choose whose memory this is")).tag("__choose")
         }
-        Text(requireExplicit ? L("自己", "Myself") : L("自己 / 未关联")).tag("")
+        Text(requireExplicit ? L("自己", "Myself") : L("未关联人物", "No person assigned")).tag("")
       }
       ForEach(model.state.people) { person in
         Text(person.name + (person.note.isEmpty ? "" : " · " + person.note)).tag(person.id)

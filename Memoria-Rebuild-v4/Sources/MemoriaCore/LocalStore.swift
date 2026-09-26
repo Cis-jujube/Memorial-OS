@@ -16,10 +16,12 @@ public actor LocalStore {
       let data = try Data(contentsOf: url)
       state = try Self.decodeBackup(data)
       var recovered = state
+      var interruptedRunningTask = false
       for i in recovered.tasks.indices where recovered.tasks[i].phase.running {
         recovered.tasks[i].phase = .interrupted
+        interruptedRunningTask = true
       }
-      if recovered.tasks.contains(where: { $0.phase == .interrupted }) {
+      if interruptedRunningTask {
         try writer(Self.encodeForStorage(recovered), url)
         state = recovered
       }

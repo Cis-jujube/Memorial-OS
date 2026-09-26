@@ -27,18 +27,26 @@ public actor ToolService {
   private let budget: Double?
   private let memories: [Memory]
   private let braveKey: String
+  private let weatherTransport: Transport
   public init(
-    publicQuery: String, date: String, budget: Double?, memories: [Memory], braveKey: String = ""
+    publicQuery: String, date: String, budget: Double?, memories: [Memory], braveKey: String = "",
+    places: [Place] = [], weatherTransport: @escaping Transport = HTTP.send
   ) {
     self.publicQuery = publicQuery
     self.date = date
     self.budget = budget
     self.memories = memories
     self.braveKey = braveKey
+    self.places = places
+    self.weatherTransport = weatherTransport
   }
   public static var definitions: [ToolDefinition] {
     let empty: [String: Any] = [
       "type": "object", "properties": [:], "additionalProperties": false, "required": [],
+    ]
+    let weather: [String: Any] = [
+      "type": "object", "additionalProperties": false, "required": [],
+      "properties": ["place_id": ["type": "string", "minLength": 1, "maxLength": 100]],
     ]
     return [
       ToolDefinition(
@@ -46,7 +54,8 @@ public actor ToolService {
       ToolDefinition(
         name: "search_places", description: "使用用户提供的公共地点关键词及区域搜索地图。无价格与营业状态保证。", parameters: empty),
       ToolDefinition(
-        name: "get_weather", description: "用已查询地点的坐标获取用户所选日期的天气预报。必须先搜索地点。", parameters: empty),
+        name: "get_weather", description: "用已查询地点的坐标获取用户所选日期的天气预报。可传 place_id 指定地点；未传时使用搜索结果首项。",
+        parameters: weather),
       ToolDefinition(
         name: "search_web", description: "用用户提供的公共关键词查询网页。没有密钥时明确返回不可用。", parameters: empty),
       ToolDefinition(
@@ -102,7 +111,11 @@ public actor ToolService {
         result["unknown"] = "票价、营业时间、交通耗时未核实"
         sources = places.map(\.url)
       case "get_weather":
-        guard let place = places.first else { throw MemoriaError.invalid("请先搜索地点") }
+        let requestedID = call.arguments["place_id"] as? String
+        guard
+          let place = requestedID == nil
+            ? places.first : places.first(where: { $0.id == requestedID })
+        else { throw MemoriaError.invalid("请先搜索地点，或选择有效的地点") }
         var components = URLComponents(string: "https://api.open-meteo.com/v1/forecast")!
         components.queryItems = [
           URLQueryItem(name: "latitude", value: String(place.latitude)),
@@ -116,11 +129,15 @@ public actor ToolService {
         ]
         var request = URLRequest(url: components.url!)
         request.timeoutInterval = 15
-        let response = try await HTTP.json(request)
+        let response = try await HTTP.json(request, transport: weatherTransport)
         guard let daily = response["daily"] as? [String: Any],
           (daily["time"] as? [String])?.contains(date) == true
         else { throw MemoriaError.invalid("所选日期暂无预报") }
         result = daily
+        result["place_id"] = place.id
+        result["place_name"] = place.name
+        result["forecast_date"] = date
+        result["requested_place"] = requestedID != nil
         sources = [components.url!.absoluteString]
       case "search_web":
         guard !braveKey.isEmpty else {

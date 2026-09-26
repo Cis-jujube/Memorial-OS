@@ -6,6 +6,29 @@ struct OutingsView: View {
   @ViewState private var creating = false
   @ViewState private var editing: Outing?
   @ViewState private var cancellation: Outing?
+  var budgetAmount: Double? {
+    Double(model.outingBudget.trimmingCharacters(in: .whitespacesAndNewlines))
+  }
+  var validBudget: Bool {
+    let value = model.outingBudget.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !value.isEmpty else { return true }
+    guard let amount = budgetAmount else { return false }
+    return amount.isFinite && amount >= 0
+  }
+  var activeOutings: [Outing] {
+    let now = Date()
+    func rank(_ outing: Outing) -> Int {
+      guard let start = outing.payload.start_at.flatMap(parseDate) else { return 1 }
+      return start >= now ? 0 : 2
+    }
+    return model.state.outings.filter { !$0.cancelled }.sorted {
+      let left = rank($0)
+      let right = rank($1)
+      if left != right { return left < right }
+      if left == 2 { return ($0.payload.start_at ?? "") > ($1.payload.start_at ?? "") }
+      return ($0.payload.start_at ?? "") < ($1.payload.start_at ?? "")
+    }
+  }
   var body: some View {
     HStack {
       PageTitle(title: L("把期待，变成一次见面"), subtitle: L("从记忆出发，用实际信息补全计划。保存行程后，仍由你决定如何邀请。 "))
@@ -34,14 +57,16 @@ struct OutingsView: View {
           Spacer()
           Button(L("查询地点与天气")) { query(agent: false) }.disabled(
             model.toolBusy || model.outingPublicQuery.isEmpty
-              || (!model.outingBudget.isEmpty
-                && (Double(model.outingBudget) == nil || Double(model.outingBudget)! < 0))
+              || !validBudget
           )
           Button(L("让 Agent 规划")) { query(agent: true) }.disabled(
             model.toolBusy || model.outingPublicQuery.isEmpty
-              || (!model.outingBudget.isEmpty
-                && (Double(model.outingBudget) == nil || Double(model.outingBudget)! < 0))
+              || !validBudget
           )
+        }
+        if !validBudget {
+          Text(L("预算需为有限的非负数", "Budget must be a finite nonnegative amount."))
+            .foregroundStyle(accent)
         }
         if model.toolBusy {
           HStack {
@@ -52,13 +77,30 @@ struct OutingsView: View {
           }
         }
         ForEach(Array(model.toolReceipts.enumerated()), id: \.offset) { _, receipt in
+          let receiptTitle =
+            (receipt.data["place_name"] as? String).map {
+              receipt.displayName + " · " + $0
+            } ?? receipt.displayName
           DisclosureGroup(
-            "\(receipt.displayName) · \(receipt.status == "ok" ? L("已返回", "Returned") : L("未完成", "Incomplete"))"
+            "\(receiptTitle) · \(receipt.status == "ok" ? L("已返回", "Returned") : L("未完成", "Incomplete"))"
           ) {
             VStack(alignment: .leading, spacing: 7) {
               if let error = receipt.error { Text(L(error)).foregroundStyle(accent) }
               Text(displayDate(receipt.fetchedAt))
               if receipt.name == "get_weather", receipt.status == "ok" {
+                if let placeName = receipt.data["place_name"] as? String {
+                  if receipt.data["requested_place"] as? Bool != true {
+                    Text(
+                      L(
+                        "天气地点：\(placeName)（搜索结果首项）",
+                        "Weather for \(placeName) (first search result)"))
+                  } else {
+                    Text(L("天气地点：\(placeName)（指定地点）", "Weather for \(placeName) (specified place)"))
+                  }
+                }
+                if let forecastDate = receipt.data["forecast_date"] as? String {
+                  Text(L("预报日期：\(forecastDate)", "Forecast date: \(forecastDate)"))
+                }
                 Text(receipt.weatherDescription)
               }
               ForEach(receipt.sources, id: \.self) { source in
@@ -66,6 +108,15 @@ struct OutingsView: View {
               }
             }.font(TypeScale.body)
           }.font(TypeScale.body)
+        }
+        if !model.toolBusy && model.places.isEmpty
+          && model.toolReceipts.contains(where: { $0.name == "search_places" && $0.status == "ok" })
+        {
+          EmptyMessage(
+            title: L("没有找到地点", "No places found"),
+            detail: L(
+              "试试更具体的区域或地点名称，或直接建立手动行程草案。",
+              "Try a more specific area or place name, or create a manual outing draft."))
         }
         ForEach(model.places) { place in
           HStack(alignment: .top) {
@@ -78,15 +129,31 @@ struct OutingsView: View {
                   } else {
                     model.outingChosen.remove(place.id)
                   }
+                  model.toolReceipts.removeAll { $0.name == "get_weather" }
                 })
             ) {
               VStack(alignment: .leading, spacing: 5) {
                 Text(place.name)
                 Text(place.address).font(TypeScale.body).foregroundStyle(ink.opacity(0.68))
                 Text(L("票价与营业时间待核实")).font(TypeScale.body).foregroundStyle(accent)
+                if let forecast = model.toolReceipts.last(where: {
+                  $0.name == "get_weather" && $0.status == "ok"
+                    && $0.data["place_id"] as? String == place.id
+                }) {
+                  if let forecastDate = forecast.data["forecast_date"] as? String {
+                    Text(L("\(forecastDate) 天气", "Weather on \(forecastDate)"))
+                      .foregroundStyle(accent)
+                  }
+                  Text(forecast.weatherDescription).foregroundStyle(ink.opacity(0.68))
+                }
               }
-            }.toggleStyle(TextToggleStyle(selection: true))
+            }.toggleStyle(TextToggleStyle(selection: true)).disabled(model.toolBusy)
             Spacer()
+            if model.outingChosen.contains(place.id) {
+              Button(L("查询此地天气", "Weather here")) {
+                model.lookupWeather(for: place.id)
+              }.disabled(model.toolBusy)
+            }
             Link(L("地图"), destination: URL(string: place.url)!)
           }
         }
@@ -108,9 +175,9 @@ struct OutingsView: View {
               memoryIDs: model.state.activeMemories.filter {
                 $0.personID == model.outingPerson.nilIfEmpty
               }.map(
-                \.id), budget: Double(model.outingBudget), notes: L("费用、营业时间与交通耗时尚待核实"))
+                \.id), budget: budgetAmount, notes: L("费用、营业时间与交通耗时尚待核实"))
             creating = true
-          }.disabled(model.outingChosen.count > 2)
+          }.disabled(model.outingChosen.count > 2 || !validBudget)
         }
         if let plan = model.plan {
           VStack(alignment: .leading, spacing: 10) {
@@ -124,15 +191,11 @@ struct OutingsView: View {
         }
       }
     }
-    Text(L("近期与待定行程")).font(TypeScale.body.weight(.semibold))
-    if model.state.outings.isEmpty {
+    Text(L("行程与草案", "Outings and drafts")).font(TypeScale.body.weight(.semibold))
+    if activeOutings.isEmpty {
       EmptyMessage(title: L("留一点时间，给重要的人"), detail: L("没有具体时间也可以先保存草案。提醒只会在你明确选择时安排。"))
     }
-    ForEach(
-      model.state.outings.filter { !$0.cancelled }.sorted {
-        ($0.payload.start_at ?? "z") < ($1.payload.start_at ?? "z")
-      }
-    ) { outing in
+    ForEach(activeOutings) { outing in
       Card {
         VStack(alignment: .leading, spacing: 12) {
           HStack {
@@ -201,10 +264,11 @@ struct OutingsView: View {
     }
   }
   func query(agent: Bool) {
+    guard validBudget else { return }
     model.outingChosen = []
     model.lookup(
       publicQuery: model.outingPublicQuery, date: model.outingDate,
-      budget: Double(model.outingBudget), personID: model.outingPerson.nilIfEmpty,
+      budget: budgetAmount, personID: model.outingPerson.nilIfEmpty,
       agent: agent)
   }
 }
@@ -232,7 +296,10 @@ struct OutingSheet: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 16) {
         Text(outing == nil ? L("确认这次安排") : L("修改行程")).font(TypeScale.title)
-        TextField(L("活动名称"), text: $title).textFieldStyle(WarmFieldStyle())
+        VStack(alignment: .leading, spacing: 7) {
+          Text(L("活动名称", "Outing name"))
+          TextField(L("活动名称"), text: $title).textFieldStyle(WarmFieldStyle())
+        }
         DisclosureGroup(
           L(
             "参与者（已选 \(participants.count) 位朋友，另包含自己）",
@@ -247,8 +314,11 @@ struct OutingSheet: View {
             ).toggleStyle(TextToggleStyle(selection: true))
           }
         }
-        TextField(L("地点"), text: $location).textFieldStyle(WarmFieldStyle()).disabled(
-          editablePlan != nil)
+        VStack(alignment: .leading, spacing: 7) {
+          Text(L("地点", "Location"))
+          TextField(L("地点"), text: $location).textFieldStyle(WarmFieldStyle()).disabled(
+            editablePlan != nil)
+        }
         Toggle(L("已确定开始和结束时间"), isOn: $timed)
         if timed {
           DatePicker(L("开始"), selection: $start)
@@ -263,10 +333,16 @@ struct OutingSheet: View {
           Text(L("提醒必须在未来且不晚于活动开始")).foregroundStyle(accent)
         }
         if !cost.isEmpty && (Double(cost) == nil || Double(cost)! < 0 || !Double(cost)!.isFinite) {
-          Text(L("费用不能是负数")).foregroundStyle(accent)
+          Text(L("费用需为有限的非负数")).foregroundStyle(accent)
         }
-        TextField(L("预计总费用（人民币；未知留空）"), text: $cost).textFieldStyle(WarmFieldStyle())
-        TextField(L("备注与尚未确认事项"), text: $notes, axis: .vertical).textFieldStyle(WarmFieldStyle())
+        VStack(alignment: .leading, spacing: 7) {
+          Text(L("预计总费用", "Estimated total cost"))
+          TextField(L("预计总费用（人民币；未知留空）"), text: $cost).textFieldStyle(WarmFieldStyle())
+        }
+        VStack(alignment: .leading, spacing: 7) {
+          Text(L("备注与尚未确认事项", "Notes and open questions"))
+          TextField(L("备注与尚未确认事项"), text: $notes, axis: .vertical).textFieldStyle(WarmFieldStyle())
+        }
         if let plan = editablePlan {
           ForEach(Array(plan.stops.enumerated()), id: \.element.id) { index, stop in
             HStack {
@@ -406,9 +482,15 @@ struct SettingsView: View {
           model.configStatus = L("能力尚未验证")
           key = ""
         }
-        TextField(L("模型 ID（可按账户可用模型修改）"), text: $model.config.model).textFieldStyle(
-          WarmFieldStyle())
-        SecureField(L("API Key（留空保留已存密钥）"), text: $key).textFieldStyle(WarmFieldStyle())
+        VStack(alignment: .leading, spacing: 7) {
+          Text(L("模型 ID", "Model ID"))
+          TextField(L("模型 ID（可按账户可用模型修改）"), text: $model.config.model).textFieldStyle(
+            WarmFieldStyle())
+        }
+        VStack(alignment: .leading, spacing: 7) {
+          Text(L("API Key"))
+          SecureField(L("API Key（留空保留已存密钥）"), text: $key).textFieldStyle(WarmFieldStyle())
+        }
         Toggle(L("允许将本条原文和必要上下文发送给所选模型"), isOn: $model.config.cloudConsent)
         Toggle(L("当前模型支持工具调用（配置声明，非验证结果）"), isOn: $model.config.toolsDeclared)
         Toggle(L("使用原生 Schema（仅支持对应接口的模型）"), isOn: $model.config.nativeSchema)
@@ -432,9 +514,18 @@ struct SettingsView: View {
         Toggle(L("启用 Jev 语义判断辅助"), isOn: $model.config.jevEnabled)
         Text(L("启用后会发送必要原文、候选与少量相关记忆。判断不会自动确认记忆，失败时保留人工处理。")).font(TypeScale.body).foregroundStyle(
           ink.opacity(0.68))
-        TextField(L("Jev 模型"), text: $model.config.jevModel).textFieldStyle(WarmFieldStyle())
-        SecureField(L("Jev 独立 Key"), text: $jevKey).textFieldStyle(WarmFieldStyle())
-        SecureField(L("Brave Search Key（可选）"), text: $braveKey).textFieldStyle(WarmFieldStyle())
+        VStack(alignment: .leading, spacing: 7) {
+          Text(L("Jev 模型", "Jev model"))
+          TextField(L("Jev 模型"), text: $model.config.jevModel).textFieldStyle(WarmFieldStyle())
+        }
+        VStack(alignment: .leading, spacing: 7) {
+          Text(L("Jev 独立 Key", "Jev API key"))
+          SecureField(L("Jev 独立 Key"), text: $jevKey).textFieldStyle(WarmFieldStyle())
+        }
+        VStack(alignment: .leading, spacing: 7) {
+          Text(L("Brave Search Key（可选）", "Brave Search key (optional)"))
+          SecureField(L("Brave Search Key（可选）"), text: $braveKey).textFieldStyle(WarmFieldStyle())
+        }
         Text(L("未配置网页搜索时仍可查询地图与天气。输入后点击上方“保存配置与密钥”。")).font(TypeScale.body).foregroundStyle(
           ink.opacity(0.68))
       }

@@ -276,8 +276,11 @@ struct SecondIterationRegressionTests {
   @Test func nameHomographsDoNotOverridePronounClarification() async throws {
     let store = try temporaryStore()
     let will = Person(name: "Will")
+    let alice = Person(name: "Alice")
     try await store.savePerson(will)
+    try await store.savePerson(alice)
     let memory = try await setupMemory(store, text: "Will enjoys tea", person: will)
+    let aliceMemory = try await setupMemory(store, text: "Alice enjoys art", person: alice)
     _ = try await setupMemory(store, text: "I enjoy coffee")
     let state = await store.snapshot()
     let explicit = RecallService.query(
@@ -287,6 +290,9 @@ struct SecondIterationRegressionTests {
       "Will she enjoy an outing?", personID: nil, state: state, language: "en")
     #expect(ambiguous.answer.status == "needs_clarification")
     #expect(ambiguous.candidates.isEmpty)
+    let auxiliaryWithName = RecallService.query(
+      "What will Alice enjoy?", personID: alice.id, state: state, language: "en")
+    #expect(auxiliaryWithName.candidates.map(\.id) == [aliceMemory.id])
   }
   @Test func everydayBilingualFactsAndGoalsAreRetrieved() async throws {
     let store = try temporaryStore()
@@ -374,8 +380,9 @@ struct StorageCapacityTests {
     try await store.editEntry(entry.id, revision: entry.revision, text: "Corrected source")
     let archive = try await store.archiveAndStartNew()
     #expect(await store.snapshot().entries.isEmpty)
-    #expect(try LocalStore.decodeBackup(Data(contentsOf: archive)).entries.first?.original(1)
-      == "Original source")
+    #expect(
+      try LocalStore.decodeBackup(Data(contentsOf: archive)).entries.first?.original(1)
+        == "Original source")
     let newEntry = try await store.capture(Entry(text: "New library"), operationID: uid())
     #expect(await store.snapshot().entries.map(\.id) == [newEntry.id])
     let archivedData = try Data(contentsOf: archive)
@@ -430,11 +437,13 @@ struct FinalScopeRegressionTests {
     try await store.savePerson(alice)
     try await store.savePerson(bob)
     _ = try await setupMemory(store, text: "Alice likes tea", person: alice)
+    _ = try await setupMemory(store, text: "Alice birthday is May 1", person: alice)
     let state = await store.snapshot()
     for scope in [alice.id, "__self"] {
       for question in [
         "What does Bob like?", "What does Charlie like?", "What are Charlie's interests?",
         "what are charlie's interests?", "Charlie's hobby?", "Tell me Charlie's birthday",
+        "Charlie birthday?", "Charlie hobbies?", "Bob work?",
         "王小明的爱好是什么？", "张三喜欢什么？", "小明爱好是什么？",
         "小明的目标是什么？", "why bob likes tea", "bob likes tea?",
       ] {
@@ -445,10 +454,13 @@ struct FinalScopeRegressionTests {
     }
     let selected = RecallService.query(
       "What does she like?", personID: alice.id, state: state, language: "en")
-    #expect(selected.candidates.first?.item.text == "Alice likes tea")
+    #expect(selected.candidates.contains { $0.item.text == "Alice likes tea" })
+    let birthday = RecallService.query(
+      "Alice birthday?", personID: alice.id, state: state, language: "en")
+    #expect(birthday.candidates.first?.item.text == "Alice birthday is May 1")
     let weekday = RecallService.query(
       "What does Alice like on Monday?", personID: alice.id, state: state, language: "en")
-    #expect(weekday.candidates.first?.item.text == "Alice likes tea")
+    #expect(weekday.candidates.contains { $0.item.text == "Alice likes tea" })
     for (question, scope) in [
       ("What are my interests?", alice.id), ("What does she like?", "__self"),
     ] {

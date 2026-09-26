@@ -359,6 +359,27 @@ import SwiftUI
       } catch { if toolID == id && !Task.isCancelled { self.error = error.localizedDescription } }
     }
   }
+  func lookupWeather(for placeID: String) {
+    guard !toolBusy, places.contains(where: { $0.id == placeID }) else { return }
+    toolTask?.cancel()
+    toolID = uid()
+    let id = toolID
+    let availablePlaces = places
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd"
+    let day = formatter.string(from: outingDate)
+    toolBusy = true
+    toolTask = Task {
+      defer { if toolID == id { toolBusy = false } }
+      let service = ToolService(
+        publicQuery: outingPublicQuery, date: day, budget: nil, memories: [],
+        places: availablePlaces)
+      let receipt = await service.execute(
+        ToolCall(id: uid(), name: "get_weather", arguments: ["place_id": placeID]))
+      guard toolID == id, !Task.isCancelled else { return }
+      toolReceipts.append(receipt)
+    }
+  }
   func invalidateOutingLookup() {
     toolTask?.cancel()
     toolID = uid()

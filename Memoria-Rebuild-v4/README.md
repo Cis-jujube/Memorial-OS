@@ -18,14 +18,14 @@
 
 侧栏底部或设置页可即时切换 **中文 / English**，退出重开后保留选择。默认跟随系统首选语言。界面、日期、常见状态和错误使用所选语言；人物姓名、聊天原文及记忆引用保持原样。
 
-**整理台 / Review desk** 是侧栏第二项，快捷键 Command-Shift-R。它集中显示待确认建议、进行中/失败整理，以及未整理的原文。“保存并整理”直接进入整理台；没有建议时，仍会明确显示未完成任务。手动整理后可检查完整原文，再点击“已检查原文，标记已处理”；只确认其中一条记忆不会让整条原文退出整理台。这个动作保留未处理片段和其他待确认建议。
+**整理台 / Review desk** 是侧栏第二项，快捷键 Command-Shift-R。侧栏显示待办原文数，整理台分别显示待确认、需要处理与未整理原文的数量。“保存并整理”直接进入整理台；没有建议时，仍会明确显示未完成任务。手动整理后可检查完整原文，再点击“已检查原文，标记已审阅”；只确认其中一条记忆不会让整条原文退出整理台。标记审阅后会从“需要处理”移出，但错误、未处理片段和其他待确认建议仍可在最近记录中查看或重试。
 
 English users: use the sidebar language selector, then **Capture → Review desk → Ask**. Confirm a memory before querying it. Select a person, choose **Myself**, or let the app detect a name. For your own memories, select **Myself** explicitly (also available as a one-click clarification). Unresolved identity asks for clarification instead of using your own memories for an unknown person. Local retrieval supports common Chinese and English intents; it is a bounded keyword/intent search, not general semantic search.
 
 ## 通用文本导入 / Text import
 
 1. 打开侧栏“导入 / Import”，粘贴文本，或选择 UTF-8 / 带 BOM 的 UTF-16 TXT、Markdown 文件。
-2. 选择是否按空行分段，关联人物（可留空），点击预览。
+2. 选择是否按空行分段，关联人物（可留空；留空表示未关联，不等于确认属于自己），点击预览。
 3. 勾选需要的片段，再确认导入。姓名、时间和消息顺序保留在原文里，不自动推断说话人。
 4. 到整理台“未整理原文”继续手动或云端整理。导入本身只写本机原文，不发起 AI 请求、不直接确认记忆。
 
@@ -38,7 +38,7 @@ English users: use the sidebar language selector, then **Capture → Review desk
 1. 打开设置，点击“准备虚构人物与演示输入”。回到记录后点击“保存并整理”。
 2. 在整理台展开原文依据，确认“喜欢安静的展览”；时间未定的计划仍保持待处理。
 3. 到问一问输入“小林有什么爱好？周末约她怎么安排？”，查看本地回答、个性化依据与通用建议。点击来源可以打开原文。
-4. 到行程输入公共区域和地点关键词，查询 MapKit 地点、Open-Meteo 天气和可选的 Brave 网页信息。选择最多两站，检查地点顺序、参与者、具体时间与人民币总额，再保存草案或行程。
+4. 到行程输入公共区域和地点关键词，查询 MapKit 地点、Open-Meteo 天气和可选的 Brave 网页信息。首轮天气查询使用搜索结果首项，回执会标出该地点；选中其他地点后可点击“查询此地天气”，核对对应地点的预报。选择最多两站，检查地点顺序、参与者、具体时间与人民币总额，再保存草案或行程。
 5. 活动后记录反馈；用“手动整理”填写明确的偏好，选择要替换的旧记忆并保存。下次查询只使用生效版本；历史可回看。
 
 演示只支持预设的固定合成提取响应，没有暗中把网络失败替换成演示。已经生成的演示原文有明确标记。地图查询仍是真实请求。
@@ -91,14 +91,14 @@ swift format lint --recursive Sources Tests Package.swift
 
 本机 CLT 6.4 的默认 SwiftPM 构建后端会间歇遗漏 Swift Testing 宏插件路径。`scripts/test.sh` 从 `xcrun --find swiftc` 推导已安装插件目录，再运行 `swift test -Xswiftc -plugin-path ...`，没有安装依赖或关闭检查。XCTest 在本机 CLT 不可用，因此测试使用随工具链提供的 Swift Testing。
 
-2026-09-26 迭代：74 tests / 17 suites 通过；新增覆盖双语检索、未知人物隔离、当前版本队列、计划去重、选择导入、草稿与手动恢复路径、删除重开、损坏库恢复及容量失败回滚。新一轮原始测试和构建日志仅保存在本机，运行证据索引见 `docs/iteration-verification.json`；`docs/qa/` 仅含隔离测试资料库的合成数据 AX 记录。formatter 已运行；lint 对 JSON 契约 snake_case DTO 与 `L` 文案辅助函数仍有命名建议，未关闭规则。
+2026-09-26 迭代：76 tests / 17 suites 通过；新增覆盖双语检索、未知人物隔离、当前版本队列、计划去重、选择导入、草稿与手动恢复路径、删除重开、损坏库恢复、容量失败回滚，以及指定地点天气坐标。新一轮原始测试和构建日志仅保存在本机，运行证据索引见 `docs/iteration-verification.json`；`docs/qa/` 仅含隔离测试资料库的合成数据 AX 记录。本轮改动文件已运行 formatter 和 strict lint。
 
 这些原始日志只保留在开发机器，不随公共仓库发布。克隆后可以用上面的命令重新生成验证结果。
 
 ## 还没有完成或没有实测的部分
 
 - 六家模型和 Jev 的付费真实请求未验证；没有读取旧项目 Key，也没有宣称分类准确率提高。真实模型中文语义质量需要固定样例评估。
-- Brave 网页搜索未配置 Key；天气调用已实现，但本轮桌面查询未验证成功返回预报。MapKit 已真实返回六个地点。
+- Brave 网页搜索未配置 Key。使用不含个人资料的公共关键词，MapKit 实际返回六个地点；Open-Meteo 实际返回搜索首项和手动选中第二个地点的预报，回执显示对应地点、日期与来源。其他城市、日期和服务故障路径仍依赖测试及后续实测。
 - 系统通知代码已接入，授权拒绝和保存结果分开；本轮没有申请通知权限，也未实测到点弹出。
 - 自动从自然语言“取消/修改某个活动”唯一匹配已有行程尚未完成；可通过行程详情手动修改/取消，并执行版本校验。
 - 多站方案支持最多两站、调整顺序、保存来源和总时间；逐站时间/交通路由/价格核验未完成，未知信息明确显示未知。

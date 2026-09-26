@@ -317,7 +317,7 @@
   "未知行程操作": "Unknown outing action",
   "取消不能携带新方案": "A cancellation cannot include a new plan",
   "请检查标题、时区和参与者": "Check the title, time zone and participants",
-  "费用不能是负数": "Cost must be a finite nonnegative amount",
+  "费用需为有限的非负数": "Cost must be a finite nonnegative amount",
   "日期必须包含时区": "Dates must include a time zone",
   "时间偏移与时区不一致": "Time offset does not match the time zone",
   "结束时间必须晚于开始时间": "End time must be after start time",

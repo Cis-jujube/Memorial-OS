@@ -59,15 +59,23 @@ struct CaptureView: View {
       TextField(L("搜索原文"), text: $search).textFieldStyle(WarmFieldStyle()).frame(width: 200)
     }
     if entries.isEmpty {
-      EmptyMessage(title: L("从一条小事开始"), detail: L("写下最近的一次见面，或者一个不想忘记的偏好。你的记忆会在这里慢慢生长。"))
+      if search.isEmpty && !pendingOnly && model.state.entries.allSatisfy(\.deleted) {
+        EmptyMessage(title: L("从一条小事开始"), detail: L("写下最近的一次见面，或者一个不想忘记的偏好。你的记忆会在这里慢慢生长。"))
+      } else {
+        EmptyMessage(
+          title: L("没有匹配的记录", "No matching records"),
+          detail: L("试试其他关键词，或关闭“只看待确认”。", "Try another search or turn off Pending only."))
+      }
     }
-    ForEach(entries) { entry in
-      EntryCard(entry: entry)
-        .frame(maxWidth: 900, alignment: .leading).padding(.leading, 24)
-        .transition(
-          .asymmetric(
-            insertion: .opacity.combined(with: .move(edge: .top)),
-            removal: .opacity.combined(with: .scale(scale: 0.97))))
+    LazyVStack(alignment: .leading, spacing: 18) {
+      ForEach(entries) { entry in
+        EntryCard(entry: entry)
+          .frame(maxWidth: 900, alignment: .leading).padding(.leading, 24)
+          .transition(
+            .asymmetric(
+              insertion: .opacity.combined(with: .move(edge: .top)),
+              removal: .opacity.combined(with: .scale(scale: 0.97))))
+      }
     }.animation(
       reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.76),
       value: model.state.revision)
@@ -153,11 +161,11 @@ struct EntryCard: View {
         {
           Text(
             L(
-              "检查完整原文后，可以将这条整理标记为已处理；未确认建议和未处理片段仍会保留。",
-              "After checking the entire original, mark this record reviewed. Pending suggestions and unprocessed excerpts are retained."
+              "检查完整原文后，可以标记已审阅。这会将记录从“需要处理”移出；错误、未确认建议和未处理片段仍可在最近记录中查看或重试。",
+              "After checking the entire original, mark it reviewed. It leaves Needs attention; errors, pending suggestions and unprocessed excerpts remain in Recent records for review or retry."
             )
           ).foregroundStyle(ink.opacity(0.68))
-          Button(L("已检查原文，标记已处理", "I reviewed the original · Mark reviewed")) {
+          Button(L("已检查原文，标记已审阅", "I reviewed the original · Mark reviewed")) {
             model.perform {
               try await $0.markReviewed(
                 entry.id, revision: entry.revision, requestID: task?.request_id)
@@ -358,10 +366,12 @@ struct ManualMemorySheet: View {
         Text("\(value.count) / 500" + (value.count > 500 ? L(" · 内容过长", " · Too long") : ""))
           .foregroundStyle(value.count > 500 ? accent : ink.opacity(0.68))
         PersonPicker(selection: $person, requireExplicit: true)
-        Text(L(
-          "请自己写下要确认的记忆，并选择属于谁。",
-          "Write the memory to confirm and choose whose it is."
-        )).foregroundStyle(ink.opacity(0.68))
+        Text(
+          L(
+            "请自己写下要确认的记忆，并选择属于谁。",
+            "Write the memory to confirm and choose whose it is."
+          )
+        ).foregroundStyle(ink.opacity(0.68))
         Picker(L("内容"), selection: $kind) {
           Text(L("偏好")).tag(Kind.preference)
           Text(L("事实 / 描述")).tag(Kind.fact)

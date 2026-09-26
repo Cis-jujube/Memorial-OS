@@ -192,7 +192,7 @@ public enum Contract {
       Set(p.participant_ids).count == p.participant_ids.count
     else { throw MemoriaError.invalid("请检查标题、时区和参与者") }
     if let cost = p.estimated_total_cost, !cost.isFinite || cost < 0 {
-      throw MemoriaError.invalid("费用不能是负数")
+      throw MemoriaError.invalid("费用需为有限的非负数")
     }
     for value in [p.start_at, p.end_at, p.remind_at].compactMap({ $0 }) {
       guard let date = parseDate(value) else { throw MemoriaError.invalid("日期必须包含时区") }

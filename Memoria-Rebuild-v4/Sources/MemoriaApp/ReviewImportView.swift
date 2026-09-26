@@ -11,6 +11,9 @@ struct ReviewDeskView: View {
   var attentionEntries: [Entry] {
     model.state.entries.filter { ReviewQueue.needsAttention($0, in: model.state) }
   }
+  var unorganizedEntries: [Entry] {
+    model.state.entries.filter { ReviewQueue.isUnorganized($0, in: model.state) }
+  }
   var body: some View {
     PageTitle(
       title: L("整理台", "Review desk"),
@@ -26,7 +29,7 @@ struct ReviewDeskView: View {
               ? L("待确认", "To review") + " · \(pending.count)"
               : value == "attention"
                 ? L("需要处理", "Needs attention") + " · \(attentionEntries.count)"
-                : L("未整理原文", "Unorganized"))
+                : L("未整理原文", "Unorganized") + " · \(unorganizedEntries.count)")
         }.buttonStyle(WarmButtonStyle(primary: model.reviewFilter == value)).accessibilityAddTraits(
           model.reviewFilter == value ? .isSelected : [])
       }
@@ -36,7 +39,7 @@ struct ReviewDeskView: View {
         WarmFieldStyle())
       Picker(L("人物范围", "Person"), selection: $person) {
         Text(L("所有人物", "Everyone")).tag("all")
-        Text(L("自己 / 未关联", "Me / unassigned")).tag("")
+        Text(L("未关联人物", "No person assigned")).tag("")
         ForEach(model.state.people) { Text($0.name).tag($0.id) }
       }.frame(maxWidth: 280)
     }
@@ -62,8 +65,10 @@ struct ReviewDeskView: View {
       }
       if items.isEmpty {
         EmptyMessage(
-          title: attentionEntries.isEmpty
-            ? L("这一页已整理好", "All clear here") : L("暂无可确认建议", "No suggestions ready yet"),
+          title: !search.isEmpty || person != "all"
+            ? L("没有匹配的建议", "No matching suggestions")
+            : attentionEntries.isEmpty && unorganizedEntries.isEmpty
+              ? L("这一页已整理好", "All clear here") : L("暂无可确认建议", "No suggestions ready yet"),
           detail: L(
             "没有匹配的待确认建议。可以继续记录，或查看未整理原文。",
             "No matching suggestions. Capture something new or review unorganized records."))
@@ -85,7 +90,8 @@ struct ReviewDeskView: View {
       }
       if entries.isEmpty {
         EmptyMessage(
-          title: L("这里暂时没有记录", "Nothing here yet"),
+          title: !search.isEmpty || person != "all"
+            ? L("没有匹配的记录", "No matching records") : L("这里暂时没有记录", "Nothing here yet"),
           detail: L(
             "导入或保存的原文会出现在这里。失败的整理也能在此重试。",
             "Saved and imported records appear here. Interrupted organization can be retried."))

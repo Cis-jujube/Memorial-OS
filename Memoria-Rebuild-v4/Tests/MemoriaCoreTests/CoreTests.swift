@@ -178,6 +178,10 @@ final class TaskLifecycleTests {
     let restarted = try LocalStore(url: await store.url)
     let s = await restarted.snapshot()
     expectEqual(s.tasks.last?.phase, .interrupted)
+    let openedWithoutWriting = try LocalStore(url: await store.url) { _, _ in
+      throw MemoriaError.invalid("unchanged library must not be rewritten")
+    }
+    expectEqual(await openedWithoutWriting.snapshot().tasks.last?.phase, .interrupted)
   }
   @Test func testManualConfirmationInvalidatesLateModel() async throws {
     let store = try temporaryStore()
@@ -398,6 +402,49 @@ final class OutingValidationTests {
     let service = ToolService(publicQuery: "test", date: "2026-09-22", budget: nil, memories: [])
     let result = await service.execute(ToolCall(id: "bad", name: "send_message", arguments: [:]))
     expectEqual(result.status, "error")
+  }
+  @Test func weatherSelectionRejectsUnknownPlaceWithoutNetwork() async {
+    let place = Place(
+      name: "Test garden", address: "Synthetic location", latitude: 0, longitude: 0,
+      url: "https://maps.apple.com/?ll=0,0")
+    let service = ToolService(
+      publicQuery: "test", date: "2026-09-22", budget: nil, memories: [], places: [place])
+    let receipt = await service.execute(
+      ToolCall(id: uid(), name: "get_weather", arguments: ["place_id": "missing-place"]))
+    expectEqual(receipt.status, "error")
+    expectTrue(receipt.sources.isEmpty)
+  }
+  @Test func weatherSelectionUsesSecondPlaceCoordinatesAndDate() async throws {
+    let first = Place(
+      name: "First", address: "Synthetic", latitude: 0, longitude: 0,
+      url: "https://maps.apple.com/?ll=0,0")
+    let second = Place(
+      name: "Second", address: "Synthetic", latitude: 1.5, longitude: 2.5,
+      url: "https://maps.apple.com/?ll=1.5,2.5")
+    let service = ToolService(
+      publicQuery: "test", date: "2026-09-22", budget: nil, memories: [],
+      places: [first, second],
+      weatherTransport: { request in
+        let items = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems
+        expectEqual(items?.first(where: { $0.name == "latitude" })?.value, "1.5")
+        expectEqual(items?.first(where: { $0.name == "longitude" })?.value, "2.5")
+        expectEqual(items?.first(where: { $0.name == "start_date" })?.value, "2026-09-22")
+        let data = try JSONSerialization.data(withJSONObject: [
+          "daily": ["time": ["2026-09-22"], "temperature_2m_max": [28.0]]
+        ])
+        return (
+          data,
+          HTTPURLResponse(
+            url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        )
+      })
+    let receipt = await service.execute(
+      ToolCall(id: uid(), name: "get_weather", arguments: ["place_id": second.id]))
+    expectEqual(receipt.status, "ok")
+    expectEqual(receipt.data["place_id"] as? String, second.id)
+    expectEqual(receipt.data["place_name"] as? String, "Second")
+    expectEqual(receipt.data["forecast_date"] as? String, "2026-09-22")
+    expectEqual(receipt.data["requested_place"] as? Bool, true)
   }
 }
 

@@ -31,6 +31,18 @@ public enum RecallService {
           "(?i)\\b" + NSRegularExpression.escapedPattern(for: name)
           + "\\s+(?:i|you|he|she|it|we|they|there|be|have)\\b"
         if question.range(of: auxiliary, options: .regularExpression) != nil { return false }
+        let followedByAnotherPerson = state.people.contains { person in
+          (person.aliases + [person.name]).contains { otherName in
+            guard otherName.localizedCaseInsensitiveCompare(name) != .orderedSame else {
+              return false
+            }
+            let pattern =
+              "(?i)\\b" + NSRegularExpression.escapedPattern(for: name) + "\\s+"
+              + NSRegularExpression.escapedPattern(for: otherName) + "\\b"
+            return question.range(of: pattern, options: .regularExpression) != nil
+          }
+        }
+        if followedByAnotherPerson { return false }
       }
       return true
     }
@@ -80,15 +92,20 @@ public enum RecallService {
         "(?i)\\b([a-z][a-z]+)\\s+(?:likes|loves|enjoys|prefers|hates)\\b"
       )
       .flatMap { commonSentenceWords.contains($0.lowercased()) ? nil : $0 }
+      let englishShortSubject = mentionedSubject(
+        "(?i)\\b([a-z][a-z]+)\\s+(?:birthday|hobbies|hobby|interests|interest|preferences|preference|personality|goals|goal|work|job|school|experience)\\b"
+      )
+      .flatMap { commonSentenceWords.contains($0.lowercased()) ? nil : $0 }
       let chineseFields = "生日|爱好|兴趣|偏好|工作|职业|住址|性格|目标|计划|打算|经历|学校|专业|资料"
       let chinesePossessiveSubject = mentionedSubject(
         "([\\p{Han}]{2,5})的(?:\(chineseFields))")
       let chineseDirectSubject = mentionedSubject(
-        "([\\p{Han}]{2,3})(?:\(chineseFields)|喜欢|有什么爱好|住在哪里)")
-        .flatMap { subject in
-          subject.hasSuffix("的") || subject.contains("什么") || subject.contains("在哪")
-            || subject.contains("哪里") ? nil : subject
-        }
+        "([\\p{Han}]{2,3})(?:\(chineseFields)|喜欢|有什么爱好|住在哪里)"
+      )
+      .flatMap { subject in
+        subject.hasSuffix("的") || subject.contains("什么") || subject.contains("在哪")
+          || subject.contains("哪里") ? nil : subject
+      }
       let chineseSubject = chinesePossessiveSubject ?? chineseDirectSubject
       let chosen = people.first
       let chosenNames = chosen.map { [$0.name] + $0.aliases } ?? []
@@ -99,7 +116,10 @@ public enum RecallService {
           })
       }
       let conflictsWithQuestion =
-        [englishPossessive, englishVerbSubject, englishStatementSubject, chineseSubject]
+        [
+          englishPossessive, englishVerbSubject, englishStatementSubject, englishShortSubject,
+          chineseSubject,
+        ]
         .compactMap { $0 }.contains {
           subject in
           !chosenNames.contains(where: { chosenName in

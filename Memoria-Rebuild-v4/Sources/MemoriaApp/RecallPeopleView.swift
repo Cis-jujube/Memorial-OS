@@ -149,109 +149,17 @@ struct PeopleView: View {
   @ViewState private var search = ""
   @ViewState private var deleting = false
   var person: Person? { model.state.people.first { $0.id == selected } }
+  var filteredPeople: [Person] {
+    model.state.people.filter {
+      search.isEmpty || $0.name.localizedCaseInsensitiveContains(search)
+        || $0.note.localizedCaseInsensitiveContains(search)
+    }
+  }
   var body: some View {
     HStack {
       PageTitle(title: L("重要的人"), subtitle: L("不必填满一张档案。那些相处中的小细节，就足够珍贵。 "))
       Spacer()
       Button(L("添加人物")) { adding = true }.buttonStyle(WarmButtonStyle(primary: true))
-    }
-    TextField(L("搜索姓名或备注"), text: $search).textFieldStyle(WarmFieldStyle())
-    if model.state.people.isEmpty {
-      EmptyMessage(title: L("先记住一个名字"), detail: L("为重要的人建立一处轻松的记录空间。姓名相同的人也可以分别建档。"))
-    }
-    HStack(alignment: .top, spacing: 20) {
-      VStack(spacing: 8) {
-        ForEach(
-          model.state.people.filter {
-            search.isEmpty || $0.name.localizedCaseInsensitiveContains(search)
-              || $0.note.localizedCaseInsensitiveContains(search)
-          }
-        ) { p in
-          Button {
-            selected = p.id
-          } label: {
-            HStack {
-              Text(String(p.name.prefix(1))).font(TypeScale.body).frame(width: 40, height: 40)
-                .background(accent.opacity(0.10), in: Circle())
-              VStack(alignment: .leading, spacing: 4) {
-                Text(p.name).font(TypeScale.body)
-                Text(p.note.isEmpty ? L("还没有备注") : p.note).font(TypeScale.body).foregroundStyle(
-                  ink.opacity(0.68)
-                ).lineLimit(2)
-              }
-              Spacer()
-            }.padding(12).frame(maxWidth: .infinity).background(
-              p.id == selected ? Color.white : Color.clear, in: RoundedRectangle(cornerRadius: 12))
-          }.buttonStyle(.plain)
-        }
-      }.frame(width: 235)
-      if let person {
-        Card {
-          VStack(alignment: .leading, spacing: 18) {
-            HStack {
-              Text(person.name).font(TypeScale.title)
-              Spacer()
-              Button(L("编辑")) { editing = person }
-              Button(L("删除"), role: .destructive) { deleting = true }
-            }
-            Text(person.note.isEmpty ? L("还没有备注") : person.note).foregroundStyle(ink.opacity(0.68))
-            if !person.importantDate.isEmpty { Text(person.importantDate).font(TypeScale.body) }
-            HStack {
-              Button(L("问问关于 TA 的事")) {
-                model.queryPerson = person.id
-                model.query = L("有什么爱好？")
-                model.page = "问一问"
-                model.ask()
-              }
-              Button(L("记一件事")) {
-                model.openCapture(personID: person.id)
-              }
-            }
-            Divider()
-            Text(L("已确认记忆")).font(TypeScale.body)
-            let memories = model.state.activeMemories.filter { $0.personID == person.id }
-            if memories.isEmpty {
-              Text(L("还没有确认过的记忆。先记一件和 TA 有关的事吧。")).foregroundStyle(ink.opacity(0.68))
-            }
-            ForEach(memories) { m in
-              VStack(alignment: .leading, spacing: 8) {
-                Text(m.item.text)
-                SourcesRow(ids: [m.id])
-                HStack {
-                  Button(L("纠正 / 更新")) {
-                    if model.openCapture(personID: person.id) {
-                      model.notice = L("记录新内容后，在手动整理中选择替换旧记忆")
-                    }
-                  }
-                  Button(L("撤销这条记忆")) {
-                    model.perform { try await $0.revoke(m.id, expected: m.revision) }
-                  }
-                }.font(TypeScale.body)
-              }
-              Divider()
-            }
-            DisclosureGroup(L("历史版本")) {
-              ForEach(
-                model.state.memories.filter { $0.personID == person.id && $0.status != .active }
-              ) { m in
-                HStack {
-                  Text(m.item.text)
-                  Spacer()
-                  Text(m.status.displayName).foregroundStyle(ink.opacity(0.68))
-                }.font(TypeScale.body)
-              }
-            }
-            Text(L("相关行程")).font(TypeScale.body)
-            ForEach(
-              model.state.outings.filter {
-                $0.payload.participant_ids.contains(person.id) && !$0.cancelled
-              }
-            ) { o in Text(o.payload.title).font(TypeScale.body) }
-          }
-        }
-      } else if !model.state.people.isEmpty {
-        EmptyMessage(title: L("选一个人，看看近况"), detail: L("已确认的偏好、共同经历和行程会聚在一起。"))
-      }
     }
     .sheet(isPresented: $adding) { PersonSheet(person: Person(name: ""), isNew: true) }
     .sheet(item: $editing) { PersonSheet(person: $0, isNew: false) }
@@ -260,6 +168,107 @@ struct PeopleView: View {
         let id = selected
         model.perform { try await $0.deletePerson(id) }
         selected = ""
+      }
+    }
+    TextField(L("搜索姓名或备注"), text: $search).textFieldStyle(WarmFieldStyle())
+    if model.state.people.isEmpty {
+      EmptyMessage(title: L("先记住一个名字"), detail: L("为重要的人建立一处轻松的记录空间。姓名相同的人也可以分别建档。"))
+    }
+    if !model.state.people.isEmpty && filteredPeople.isEmpty {
+      EmptyMessage(
+        title: L("没有匹配的人物", "No matching people"),
+        detail: L("试试姓名或备注中的其他关键词。", "Try another name or note keyword."))
+    } else if !filteredPeople.isEmpty {
+      HStack(alignment: .top, spacing: 20) {
+        VStack(spacing: 8) {
+          ForEach(filteredPeople) { p in
+            Button {
+              selected = p.id
+            } label: {
+              HStack {
+                Text(String(p.name.prefix(1))).font(TypeScale.body).frame(width: 40, height: 40)
+                  .background(accent.opacity(0.10), in: Circle())
+                VStack(alignment: .leading, spacing: 4) {
+                  Text(p.name).font(TypeScale.body)
+                  Text(p.note.isEmpty ? L("还没有备注") : p.note).font(TypeScale.body).foregroundStyle(
+                    ink.opacity(0.68)
+                  ).lineLimit(2)
+                }
+                Spacer()
+              }.padding(12).frame(maxWidth: .infinity).background(
+                p.id == selected ? Color.white : Color.clear, in: RoundedRectangle(cornerRadius: 12)
+              )
+            }.buttonStyle(.plain)
+          }
+        }.frame(width: 235)
+        if let person, filteredPeople.contains(where: { $0.id == person.id }) {
+          Card {
+            VStack(alignment: .leading, spacing: 18) {
+              HStack {
+                Text(person.name).font(TypeScale.title)
+                Spacer()
+                Button(L("编辑")) { editing = person }
+                Button(L("删除"), role: .destructive) { deleting = true }
+              }
+              Text(person.note.isEmpty ? L("还没有备注") : person.note).foregroundStyle(
+                ink.opacity(0.68))
+              if !person.importantDate.isEmpty { Text(person.importantDate).font(TypeScale.body) }
+              HStack {
+                Button(L("问问关于 TA 的事")) {
+                  model.queryPerson = person.id
+                  model.query = L("有什么爱好？")
+                  model.page = "问一问"
+                  model.ask()
+                }
+                Button(L("记一件事")) {
+                  model.openCapture(personID: person.id)
+                }
+              }
+              Divider()
+              Text(L("已确认记忆")).font(TypeScale.body)
+              let memories = model.state.activeMemories.filter { $0.personID == person.id }
+              if memories.isEmpty {
+                Text(L("还没有确认过的记忆。先记一件和 TA 有关的事吧。")).foregroundStyle(ink.opacity(0.68))
+              }
+              ForEach(memories) { m in
+                VStack(alignment: .leading, spacing: 8) {
+                  Text(m.item.text)
+                  SourcesRow(ids: [m.id])
+                  HStack {
+                    Button(L("纠正 / 更新")) {
+                      if model.openCapture(personID: person.id) {
+                        model.notice = L("记录新内容后，在手动整理中选择替换旧记忆")
+                      }
+                    }
+                    Button(L("撤销这条记忆")) {
+                      model.perform { try await $0.revoke(m.id, expected: m.revision) }
+                    }
+                  }.font(TypeScale.body)
+                }
+                Divider()
+              }
+              DisclosureGroup(L("历史版本")) {
+                ForEach(
+                  model.state.memories.filter { $0.personID == person.id && $0.status != .active }
+                ) { m in
+                  HStack {
+                    Text(m.item.text)
+                    Spacer()
+                    Text(m.status.displayName).foregroundStyle(ink.opacity(0.68))
+                  }.font(TypeScale.body)
+                }
+              }
+              Text(L("相关行程")).font(TypeScale.body)
+              ForEach(
+                model.state.outings.filter {
+                  $0.payload.participant_ids.contains(person.id) && !$0.cancelled
+                }
+              ) { o in Text(o.payload.title).font(TypeScale.body) }
+            }
+          }
+        } else if !model.state.people.isEmpty {
+          EmptyMessage(title: L("选一个人，看看近况"), detail: L("已确认的偏好、共同经历和行程会聚在一起。"))
+        }
       }
     }
   }
@@ -274,10 +283,19 @@ struct PersonSheet: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 20) {
       Text(isNew ? L("添加一个重要的人") : L("编辑人物")).font(TypeScale.title)
-      TextField(L("姓名"), text: $person.name).textFieldStyle(WarmFieldStyle())
-      TextField(L("简短备注，例如同学 / 同事"), text: $person.note).textFieldStyle(WarmFieldStyle())
-      TextField(L("重要日期，例如生日 5 月 6 日"), text: $person.importantDate).textFieldStyle(
-        WarmFieldStyle())
+      VStack(alignment: .leading, spacing: 7) {
+        Text(L("姓名", "Name"))
+        TextField(L("姓名"), text: $person.name).textFieldStyle(WarmFieldStyle())
+      }
+      VStack(alignment: .leading, spacing: 7) {
+        Text(L("简短备注", "Short note"))
+        TextField(L("简短备注，例如同学 / 同事"), text: $person.note).textFieldStyle(WarmFieldStyle())
+      }
+      VStack(alignment: .leading, spacing: 7) {
+        Text(L("重要日期", "Important date"))
+        TextField(L("重要日期，例如生日 5 月 6 日"), text: $person.importantDate).textFieldStyle(
+          WarmFieldStyle())
+      }
       if !formError.isEmpty { Text(formError).foregroundStyle(accent) }
       HStack {
         Button(L("取消")) { dismiss() }
