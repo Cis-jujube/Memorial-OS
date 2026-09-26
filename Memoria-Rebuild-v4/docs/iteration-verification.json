@@ -1,0 +1,47 @@
+{
+  "date": "2026-09-26",
+  "scope": "Isolated --review-session library; synthetic text only; no real WeChat access",
+  "checks": [
+    "74 Swift tests in 17 suites passed with ./scripts/test.sh",
+    "Final build and ad hoc signature verification passed with ./scripts/build-and-run.sh --build-only",
+    "Runtime: English sidebar includes Capture, Review desk, Ask, People, Outings, Import, Settings",
+    "Runtime: switching Chinese/English updates navigation, controls and date immediately; query text retained",
+    "Runtime: preview of two synthetic chat excerpts, deselect second, import receipt Imported 1 / skipped 0",
+    "Runtime: imported excerpt appears under Review desk Unorganized; partial manual confirmation leaves it in Unorganized until full-original review",
+    "Runtime: explicit Myself scope returns confirmed I like quiet exhibitions; source sheet contains exact sender/time/original",
+    "Runtime: demo Save & organize opens Review desk with 2 suggestions; confirm preference then create prefilled draft, pending count becomes 0",
+    "Runtime: language choice persists across restart; record dates use selected locale",
+    "Runtime: no-cloud Save & organize shows Needs attention 1 and configuration error with retry/manual actions",
+    "Runtime: one-click person clarification retains original English question and returns Chinese source-backed preference",
+    "Runtime: preview 2 excerpts, deselect 1, navigate to People and back; text and selection 1/2 retained",
+    "Regression: unknown named people, incidental first-person wording and missing selected IDs never retrieve self memories",
+    "Regression: partial manual confirmation keeps the original in Review desk until explicit whole-original review",
+    "Navigation: outing query, person, date, budget and selected stops stay with retained results across pages",
+    "Regression: explicit manual-review completion removes attention while preserving pending suggestions/error evidence",
+    "Regression: total store capacity rejected atomically; previous library reopens",
+    "Regression: invalid outing action leaves no orphan plan; duplicate import does not change revision",
+    "Regression: unresolved subject or date leaves a plan proposal pending when an outing draft is saved",
+    "Regression: selected-person weekday wording retains selected scope, while unknown lowercase subject statements clarify",
+    "Regression: resolved plan re-extraction with no new suggestion reports no_suggestions",
+    "Regression: selected person conflicting with known, unknown, lowercase possessive, Chinese three-character names or pronouns returns clarification; empty extraction and fully confirmed suggestions remain in Needs attention until whole-original review",
+    "Regression: unknown Chinese goal subject remains in clarification even after choosing Myself",
+    "Regression: unreadable library retains original bytes when restored from validated backup; archiving creates a restorable full copy before an empty new library",
+    "Runtime: partial manual confirmation remains in Unorganized; explicit whole-original review clears the queue",
+    "Runtime: unknown-person clarification offers Add a person",
+    "Runtime: manual organization opens with a blank memory field and explicit subject choice; Save is disabled until both are set"
+  ],
+  "limitations": [
+    "CUA screenshot captures only distorted 130-160px window thumbnail; full pixel-layout and animation quality unverified. AX actions/readback usable.",
+    "Live paid model/Jev/Brave calls not tested; protocol fixtures only. No external credentials added.",
+    "System notification delivery not tested; persisted status is language-neutral and status-write failures leave reminders marked as needing an update.",
+    "Repeated backup restores retain every before-restore copy and may use additional disk space.",
+    "User cancelled real WeChat extraction; generic text import retained."
+  ],
+  "raw_ax_evidence": [
+    "docs/qa/pending-attention-en.txt",
+    "docs/qa/attention-error-en.txt",
+    "docs/qa/clarification-en.txt",
+    "docs/qa/import-preserved-en.txt",
+    "docs/qa/manual-defaults-zh.txt"
+  ]
+}

@@ -20,20 +20,41 @@ public actor LocalStore {
         recovered.tasks[i].phase = .interrupted
       }
       if recovered.tasks.contains(where: { $0.phase == .interrupted }) {
-        try writer(JSONEncoder().encode(recovered), url)
+        try writer(Self.encodeForStorage(recovered), url)
         state = recovered
       }
     } else {
       state = LibraryState()
     }
   }
+  /// Recover an unreadable library only after a backup has passed the normal validation.
+  /// Keep the unreadable bytes alongside the library for manual inspection or rollback.
+  public static func recover(_ backupData: Data, at url: URL) throws -> LocalStore {
+    _ = try decodeBackup(backupData)
+    let archived = url.deletingLastPathComponent().appendingPathComponent(
+      "before-restore-unreadable-\(uid()).json")
+    if FileManager.default.fileExists(atPath: url.path) {
+      try FileManager.default.copyItem(at: url, to: archived)
+    }
+    try backupData.write(to: url, options: .atomic)
+    return try LocalStore(url: url)
+  }
+  private static func encodeForStorage(_ state: LibraryState) throws -> Data {
+    let data = try JSONEncoder().encode(state)
+    guard data.count <= 20_000_000 else {
+      throw MemoriaError.invalid("资料库达到 20 MB 上限，本次修改未保存。请先导出备份，或在设置中归档并开始新库。")
+    }
+    return data
+  }
   public func snapshot() -> LibraryState { state }
   private func transaction<T>(_ body: (inout LibraryState) throws -> T) throws -> T {
     var next = state
     let result = try body(&next)
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = .sortedKeys
+    if try encoder.encode(next) == encoder.encode(state) { return result }
     next.revision += 1
-    let data = try JSONEncoder().encode(next)
-    try writer(data, url)
+    try writer(Self.encodeForStorage(next), url)
     state = next
     return result
   }
@@ -51,6 +72,33 @@ public actor LocalStore {
       s.entries.insert(entry, at: 0)
       s.operations[operationID] = entry.id
       return entry
+    }
+  }
+  public func importExcerpts(_ excerpts: [ImportExcerpt], personID: String?) throws -> ImportReceipt
+  {
+    try transaction { s in
+      guard !excerpts.isEmpty, excerpts.count <= 500,
+        excerpts.allSatisfy({
+          !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && $0.text.count <= 100_000
+        }),
+        excerpts.reduce(0, { $0 + $1.text.utf8.count }) <= 2_000_000
+      else { throw MemoriaError.invalid("导入文本无效或超过限制") }
+      if let personID, !s.people.contains(where: { $0.id == personID }) { throw MemoriaError.stale }
+      var added = 0
+      var skipped = 0
+      for excerpt in excerpts {
+        let key = excerpt.operationID(personID: personID)
+        guard s.operations[key] == nil else {
+          skipped += 1
+          continue
+        }
+        let entry = Entry(text: excerpt.text, personID: personID)
+        s.entries.insert(entry, at: 0)
+        s.operations[key] = entry.id
+        added += 1
+      }
+      return ImportReceipt(added: added, skipped: skipped)
     }
   }
   public func savePerson(_ person: Person, expected: Int? = nil) throws {
@@ -126,7 +174,8 @@ public actor LocalStore {
   public func editEntry(_ id: String, revision: Int, text: String) throws {
     try transaction { s in
       guard let i = s.entries.firstIndex(where: { $0.id == id && !$0.deleted }),
-        s.entries[i].revision == revision, !text.isEmpty
+        s.entries[i].revision == revision,
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.count <= 100_000
       else { throw MemoriaError.stale }
       s.entries[i].history.append(SourceVersion(revision: revision, text: s.entries[i].text))
       s.entries[i].text = text
@@ -137,6 +186,9 @@ public actor LocalStore {
   public func deleteEntry(_ id: String) throws {
     try transaction { s in
       guard let i = s.entries.firstIndex(where: { $0.id == id }) else { throw MemoriaError.stale }
+      if s.entries[i].deleted { return }
+      s.entries[i].history.append(
+        SourceVersion(revision: s.entries[i].revision, text: s.entries[i].text))
       s.entries[i].deleted = true
       s.entries[i].revision += 1
       Self.invalidate(id, state: &s)
@@ -190,10 +242,15 @@ public actor LocalStore {
         })
       else { throw MemoriaError.stale }
       let items = batch.analyses.flatMap(\.items)
+      let proposalCount = s.proposals.count
       for item in items {
-        if s.proposals.contains(where: {
-          $0.sourceID == task.source_id && $0.sourceRevision == task.input_revision
-            && $0.status == .confirmed && $0.item.source_quote == item.source_quote
+        if s.proposals.contains(where: { existing in
+          existing.sourceID == task.source_id && existing.sourceRevision == task.input_revision
+            && existing.item == item
+            && (existing.status == .pending
+              || (existing.status == .confirmed
+                && (existing.item.kind == .plan
+                  || s.activeMemories.contains(where: { $0.id == existing.memoryID }))))
         }) {
           continue
         }
@@ -222,13 +279,37 @@ public actor LocalStore {
         s.proposals.append(Proposal(source: source, item: item, personID: person, issue: issue))
       }
       s.tasks[i].phase =
-        items.isEmpty
+        s.proposals.count == proposalCount
         ? (batch.chunks.contains { $0.analysis == nil } ? .failed : .no_suggestions)
         : .awaiting_review
       s.tasks[i].chunks = batch.chunks
       s.tasks[i].error = batch.chunks.compactMap(\.error).first
       s.tasks[i].unprocessed = batch.remaining
       s.tasks[i].decisionStatus = decision
+    }
+  }
+  public func markReviewed(_ entryID: String, revision: Int, requestID: String?) throws {
+    try transaction { s in
+      guard
+        let source = s.entries.first(where: {
+          $0.id == entryID && $0.revision == revision && !$0.deleted
+        })
+      else { throw MemoriaError.stale }
+      if let i = s.tasks.lastIndex(where: {
+        $0.source_id == entryID && $0.input_revision == revision
+      }) {
+        guard s.tasks[i].request_id == requestID, !s.tasks[i].phase.running else {
+          throw MemoriaError.stale
+        }
+        // Preserve errors, unprocessed quotes and sibling proposals for inspection.
+        s.tasks[i].decisionStatus = ReviewQueue.reviewedDecision
+      } else {
+        guard requestID == nil else { throw MemoriaError.stale }
+        var task = TaskState(source: source)
+        task.phase = .no_suggestions
+        task.decisionStatus = ReviewQueue.reviewedDecision
+        s.tasks.append(task)
+      }
     }
   }
   public func manualProposal(
@@ -238,7 +319,10 @@ public actor LocalStore {
       guard let source = s.entries.first(where: { $0.id == sourceID && !$0.deleted }),
         source.text.contains(item.source_quote)
       else { throw MemoriaError.stale }
-      Self.invalidate(sourceID, state: &s)
+      // Manual additions must not discard sibling suggestions from the same source.
+      for i in s.tasks.indices where s.tasks[i].source_id == sourceID && s.tasks[i].phase.running {
+        s.tasks[i].phase = .cancelled
+      }
       var p = Proposal(source: source, item: item, personID: personID)
       p.edited = true
       p.replacementID = replacement?.id
@@ -334,10 +418,43 @@ public actor LocalStore {
       s.plans.append(plan)
     }
   }
-  @discardableResult public func execute(_ action: ActionDraft) throws -> String {
+  @discardableResult public func execute(
+    _ action: ActionDraft, resolving proposal: Proposal? = nil, plan: OutingPlan? = nil
+  )
+    throws -> String
+  {
     try transaction { s in
       let key = "action:\(action.id):\(action.draft_revision)"
       if let id = s.operations[key] { return id }
+      if let proposal {
+        guard action.operation == "create",
+          let current = s.proposals.first(where: { $0.id == proposal.id }),
+          current.revision == proposal.revision, current.status == .pending,
+          current.item.kind == .plan,
+          current.personID == nil
+            ? current.item.subject == "我"
+            : action.payload?.participant_ids.contains(current.personID!) == true,
+          current.issue == nil
+            || (current.issue == "你想安排在哪一天？" && action.payload?.start_at != nil
+              && action.payload?.end_at != nil),
+          s.entries.contains(where: {
+            $0.id == current.sourceID && !$0.deleted && $0.revision == current.sourceRevision
+          })
+        else { throw MemoriaError.stale }
+      }
+      if let plan {
+        guard action.proposal_id == plan.id, action.proposal_revision == plan.revision,
+          !plan.stops.isEmpty, plan.stops.count <= 2,
+          plan.budget == nil || (plan.budget!.isFinite && plan.budget! >= 0)
+        else { throw MemoriaError.invalid("方案站点或预算无效") }
+        if let old = s.plans.first(where: { $0.id == plan.id }) {
+          let encoder = JSONEncoder()
+          encoder.outputFormatting = .sortedKeys
+          guard try encoder.encode(old) == encoder.encode(plan) else { throw MemoriaError.stale }
+        } else {
+          s.plans.append(plan)
+        }
+      }
       try Contract.action(action, state: s)
       let id: String
       if action.operation == "create", let payload = action.payload {
@@ -360,6 +477,10 @@ public actor LocalStore {
         s.outings[i].notificationStatus = "通知需要更新"
       }
       s.operations[key] = id
+      if let proposal, let index = s.proposals.firstIndex(where: { $0.id == proposal.id }) {
+        s.proposals[index].status = .confirmed
+        s.proposals[index].revision += 1
+      }
       return id
     }
   }
@@ -446,7 +567,18 @@ public actor LocalStore {
       next.tasks[i].phase = .interrupted
     }
     next.revision = state.revision + 1
-    try writer(JSONEncoder().encode(next), url)
+    try writer(Self.encodeForStorage(next), url)
     state = next
+  }
+  /// Preserve the full current library as a restorable backup before freeing active capacity.
+  public func archiveAndStartNew() throws -> URL {
+    let archive = url.deletingLastPathComponent().appendingPathComponent(
+      "before-new-library-\(uid()).json")
+    try JSONEncoder().encode(state).write(to: archive, options: .atomic)
+    var next = LibraryState()
+    next.revision = state.revision + 1
+    try writer(Self.encodeForStorage(next), url)
+    state = next
+    return archive
   }
 }

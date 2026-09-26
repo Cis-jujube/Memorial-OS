@@ -220,7 +220,7 @@ final class MemoryRetrievalTests {
   @Test func testUnrelatedCandidatesDoNotAnswerBirthday() async throws {
     let store = try temporaryStore()
     _ = try await setupMemory(store)
-    let result = RecallService.query("我的生日", personID: nil, state: await store.snapshot())
+    let result = RecallService.query("我的生日", personID: "__self", state: await store.snapshot())
     expectEqual(result.answer.status, "not_found")
   }
 }

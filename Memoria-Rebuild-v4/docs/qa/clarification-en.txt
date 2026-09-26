@@ -1,0 +1,40 @@
+Window: "Memoria", App: Memoria.
+0 standard window Memoria, ID: main, Secondary Actions: Raise
+	1 container
+		2 text Record saved
+		3 button OK
+		4 text Memoria Remember with care.
+		5 button Capture
+		6 button Review desk
+		7 button (selected) Ask
+		8 button People
+		9 button Outings
+		10 button Import
+		11 button Settings
+		12 Language / 语言
+			13 radio button Description: 中文, Value: 0
+			14 radio button Description: English, Value: 1
+		15 text Your memories, your space Capture, then confirm.
+Keep what matters.
+		16 scroll area
+			17 text Someone in mind. Something to ask. Find answers in memories you have confirmed. Follow each answer back to its source.
+			18 text field (settable) Value: What does she enjoy?, Placeholder: What are Xiaolin's interests? What could we do this weekend?
+			19 pop up button Who is this about, Value: 小林 · 虚构演示人物
+			20 button Find memories
+			21 text Command-K to open · Memory search runs locally Found in your memories 喜欢安静的展览
+			22 disclosure triangle Description: View sources, Expand, Value: off
+			23 button Add a record
+			24 button Ask model for suggestions
+	25 close button
+	26 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	27 minimize button
+	28 text Memoria
+29 menu bar
+	30 Memoria Rebuild
+	31 File
+	32 Edit
+	33 View
+	34 Window
+	35 Help
+
+The focused UI element is 18 text field (settable) Value: What does she enjoy?, Placeholder: What are Xiaolin's interests? What could we do this weekend?

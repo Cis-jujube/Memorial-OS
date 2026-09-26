@@ -11,7 +11,7 @@ final class SingleInstance {
     descriptor = open(
       directory.appendingPathComponent("writer.lock").path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
     guard descriptor >= 0, flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
-      throw MemoriaError.invalid("Memoria 已在运行，请使用已打开的窗口。")
+      throw MemoriaError.invalid(L("Memoria 已在运行，请使用已打开的窗口。"))
     }
   }
   deinit { if descriptor >= 0 { close(descriptor) } }
@@ -28,7 +28,9 @@ enum Credentials {
     if status == errSecItemNotFound { return "" }
     guard status == errSecSuccess, let data = result as? Data,
       let string = String(data: data, encoding: .utf8)
-    else { throw MemoriaError.invalid("无法从钥匙串读取密钥（\(status)）") }
+    else {
+      throw MemoriaError.invalid(L("无法从钥匙串读取密钥（\(status)）", "Keychain read failed (\(status))"))
+    }
     return string
   }
   static func save(_ account: String, value: String) throws {
@@ -43,13 +45,25 @@ enum Credentials {
       insert[kSecValueData as String] = Data(value.utf8)
       insert[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
       let result = SecItemAdd(insert as CFDictionary, nil)
-      guard result == errSecSuccess else { throw MemoriaError.invalid("密钥保存失败（\(result)）") }
+      guard result == errSecSuccess else {
+        throw MemoriaError.invalid(L("密钥保存失败（\(result)）", "Keychain save failed (\(result))"))
+      }
     } else if status != errSecSuccess {
-      throw MemoriaError.invalid("密钥保存失败（\(status)）")
+      throw MemoriaError.invalid(L("密钥保存失败（\(status)）", "Keychain save failed (\(status))"))
     }
   }
 }
 enum Notifications {
+  static func reconcile(_ outings: [Outing], store: LocalStore) async throws {
+    // This bundle owns these notifications. Restoring data must also replace its reminder set.
+    UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+    for outing in outings {
+      let status = await sync(outing)
+      do {
+        try await store.notification(outing.id, revision: outing.revision, status: status)
+      } catch MemoriaError.stale { continue }
+    }
+  }
   static func sync(_ outing: Outing) async -> String {
     let center = UNUserNotificationCenter.current()
     center.removePendingNotificationRequests(withIdentifiers: [outing.id])
@@ -63,13 +77,15 @@ enum Notifications {
       }
       let content = UNMutableNotificationContent()
       content.title = outing.payload.title
-      content.body = outing.payload.location_name ?? "打开 Memoria 查看行程"
+      content.body = outing.payload.location_name ?? L("打开 Memoria 查看行程")
       content.sound = .default
       let trigger = UNTimeIntervalNotificationTrigger(
         timeInterval: max(1, date.timeIntervalSinceNow), repeats: false)
       try await center.add(
         UNNotificationRequest(identifier: outing.id, content: content, trigger: trigger))
       return "提醒已安排"
-    } catch { return "行程已保存，提醒安排失败：\(error.localizedDescription)" }
+    } catch {
+      return "行程已保存，提醒安排失败：" + error.localizedDescription
+    }
   }
 }

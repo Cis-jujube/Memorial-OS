@@ -1,0 +1,46 @@
+Window: "Memoria", App: Memoria.
+0 standard window Memoria, ID: main, Secondary Actions: Raise
+	1 container
+		2 text Record saved
+		3 button OK
+		4 text Memoria Remember with care.
+		5 button Capture
+		6 button (selected) Review desk
+		7 button Ask
+		8 button People
+		9 button Outings
+		10 button Import
+		11 button Settings
+		12 Language / 语言
+			13 radio button Description: 中文, Value: 0
+			14 radio button Description: English, Value: 1
+		15 text Your memories, your space Capture, then confirm.
+Keep what matters.
+		16 scroll area
+			17 text Review desk Your records are saved. You decide what becomes a memory.
+			18 button To review · 0
+			19 button Needs attention · 1
+			20 button Unorganized
+			21 text field (settable) Search suggestions or records
+			22 pop up button Person, Value: Everyone
+			23 list Secondary Actions: AXScrollToTop, AXScrollToBottom
+				24 text Sep 23, 2026 at 1:05 AM
+				25 menu button More
+				26 text TEST ONLY: no cloud configured.
+				27 button Expand
+				28 text Saved; organization incomplete Configure a model and enable cloud processing in Settings first.
+				29 button Organize manually
+				30 button Organize again
+	31 close button
+	32 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	33 minimize button
+	34 text Memoria
+35 menu bar
+	36 Memoria Rebuild
+	37 File
+	38 Edit
+	39 View
+	40 Window
+	41 Help
+
+The focused UI element is 0 standard window Memoria, ID: main, Secondary Actions: Raise

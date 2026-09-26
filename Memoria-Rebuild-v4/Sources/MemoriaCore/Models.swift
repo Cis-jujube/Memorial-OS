@@ -286,11 +286,12 @@ public struct Outing: Codable, Identifiable {
   public var payload: OutingPayload
   public var plan: OutingPlan?
   public var cancelled = false
-  public var notificationStatus = "未安排通知"
+  public var notificationStatus: String
   public var history: [OutingPayload] = []
   public init(payload: OutingPayload, plan: OutingPlan? = nil) {
     self.payload = payload
     self.plan = plan
+    notificationStatus = payload.remind_at == nil ? "未设置提醒" : "通知需要更新"
   }
 }
 public struct LibraryState: Codable {

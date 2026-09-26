@@ -1,0 +1,25 @@
+Isolated --review-session build, synthetic source only.
+
+Window: Memoria
+  scroll area (sidebar)
+    记录
+    整理台
+    问一问
+    人物
+    行程
+    导入
+    设置
+  Language / 语言
+    中文: selected
+    English: not selected
+
+Manual memory sheet opened from synthetic source:
+  手动整理成记忆
+  TEST ONLY: Alice likes tea. Alice likes music.
+  要记住的内容: empty
+  0 / 500
+  关联人物: 请选择归属
+  请自己写下要确认的记忆，并选择属于谁。
+  确认保存: disabled
+
+The sheet was cancelled. No memory was written in this check.

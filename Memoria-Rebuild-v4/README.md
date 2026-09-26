@@ -1,6 +1,6 @@
 # Memoria Rebuild v4
 
-独立的 macOS 个人记忆应用。原文先保存在本机，建议就地确认；从已确认记忆查询资料、生成场景建议，再进入活动草案。旧项目、旧 App、旧数据库和旧密钥均未迁移或覆盖。
+独立的 macOS 个人记忆应用。原文先保存在本机，在独立整理台确认建议；从已确认记忆查询资料、生成场景建议，再进入活动草案。旧项目、旧 App、旧数据库和旧密钥均未迁移或覆盖。
 
 ## 启动
 
@@ -14,10 +14,29 @@
 
 环境：macOS 14+ API 目标；本次实际构建使用本机 Apple Swift 6.4 / macOS 27 SDK。未在 macOS 14 实机运行。无第三方 SwiftPM 依赖。
 
+## 中文 / English 与整理台
+
+侧栏底部或设置页可即时切换 **中文 / English**，退出重开后保留选择。默认跟随系统首选语言。界面、日期、常见状态和错误使用所选语言；人物姓名、聊天原文及记忆引用保持原样。
+
+**整理台 / Review desk** 是侧栏第二项，快捷键 Command-Shift-R。它集中显示待确认建议、进行中/失败整理，以及未整理的原文。“保存并整理”直接进入整理台；没有建议时，仍会明确显示未完成任务。手动整理后可检查完整原文，再点击“已检查原文，标记已处理”；只确认其中一条记忆不会让整条原文退出整理台。这个动作保留未处理片段和其他待确认建议。
+
+English users: use the sidebar language selector, then **Capture → Review desk → Ask**. Confirm a memory before querying it. Select a person, choose **Myself**, or let the app detect a name. For your own memories, select **Myself** explicitly (also available as a one-click clarification). Unresolved identity asks for clarification instead of using your own memories for an unknown person. Local retrieval supports common Chinese and English intents; it is a bounded keyword/intent search, not general semantic search.
+
+## 通用文本导入 / Text import
+
+1. 打开侧栏“导入 / Import”，粘贴文本，或选择 UTF-8 / 带 BOM 的 UTF-16 TXT、Markdown 文件。
+2. 选择是否按空行分段，关联人物（可留空），点击预览。
+3. 勾选需要的片段，再确认导入。姓名、时间和消息顺序保留在原文里，不自动推断说话人。
+4. 到整理台“未整理原文”继续手动或云端整理。导入本身只写本机原文，不发起 AI 请求、不直接确认记忆。
+
+限制：单次 2 MB、最多 500 段、每段最多 100000 字；相同人物下的重复导入会跳过。已删除导入不会因重试自动恢复；完全相同的片段在预览中合并。离开导入页再回来，未提交草稿和勾选仍保留（不跨应用重启）。总资料库上限为 20 MB，超过时原子拒绝本次写入，保留之前可打开的版本；软删除不会释放历史占用。达到上限后可在设置中将完整旧库归档为可恢复的 JSON，再开始空白新库。归档和每次恢复前创建的备份会保留，需要用户自行管理磁盘空间。
+
+**真实微信抓取已按用户要求取消。** 这里是通用文本导入，不解密或读取微信数据库，也没有访问用户的真实聊天。
+
 ## 先试什么
 
 1. 打开设置，点击“准备虚构人物与演示输入”。回到记录后点击“保存并整理”。
-2. 展开原文依据，确认“喜欢安静的展览”；时间未定的计划仍保持待处理。
+2. 在整理台展开原文依据，确认“喜欢安静的展览”；时间未定的计划仍保持待处理。
 3. 到问一问输入“小林有什么爱好？周末约她怎么安排？”，查看本地回答、个性化依据与通用建议。点击来源可以打开原文。
 4. 到行程输入公共区域和地点关键词，查询 MapKit 地点、Open-Meteo 天气和可选的 Brave 网页信息。选择最多两站，检查地点顺序、参与者、具体时间与人民币总额，再保存草案或行程。
 5. 活动后记录反馈；用“手动整理”填写明确的偏好，选择要替换的旧记忆并保存。下次查询只使用生效版本；历史可回看。
@@ -33,6 +52,8 @@
 - 手动行程草案、修改、取消与反馈关联。
 - MapKit 地点和 Open-Meteo 天气调用路径；可用性依赖网络与服务日期覆盖。
 - JSON 备份导出、预览恢复与恢复前自动备份。
+
+如果资料库文件无法打开，设置中的“从备份恢复…”仍可选择有效备份；应用会先把无法读取的原文件另存到同一数据目录，再恢复。归档新库操作也会先保存完整旧库，随后清空当前工作库并取消旧提醒，必须在应用内再次确认。
 
 云端能力配置在设置：选择提供方、填写实际可用模型 ID、输入 API Key，打开必要的云端发送说明并保存。六家配置分别为 DeepSeek、OpenAI、Claude、Gemini、Grok、GLM；GLM 使用 Z.AI 官方端点。当前不是任意 OpenAI-compatible URL 编辑器。
 
@@ -70,7 +91,7 @@ swift format lint --recursive Sources Tests Package.swift
 
 本机 CLT 6.4 的默认 SwiftPM 构建后端会间歇遗漏 Swift Testing 宏插件路径。`scripts/test.sh` 从 `xcrun --find swiftc` 推导已安装插件目录，再运行 `swift test -Xswiftc -plugin-path ...`，没有安装依赖或关闭检查。XCTest 在本机 CLT 不可用，因此测试使用随工具链提供的 Swift Testing。
 
-本轮最终：39 tests / 10 suites 通过；记录在 `docs/tests.log`。构建与签名见 `docs/package.log`。formatter 已运行；lint 对与 JSON 契约保持一致的 snake_case DTO 名称仍有命名建议，未关闭规则。
+2026-09-26 迭代：74 tests / 17 suites 通过；新增覆盖双语检索、未知人物隔离、当前版本队列、计划去重、选择导入、草稿与手动恢复路径、删除重开、损坏库恢复及容量失败回滚。新一轮原始测试和构建日志仅保存在本机，运行证据索引见 `docs/iteration-verification.json`；`docs/qa/` 仅含隔离测试资料库的合成数据 AX 记录。formatter 已运行；lint 对 JSON 契约 snake_case DTO 与 `L` 文案辅助函数仍有命名建议，未关闭规则。
 
 这些原始日志只保留在开发机器，不随公共仓库发布。克隆后可以用上面的命令重新生成验证结果。
 
@@ -85,3 +106,9 @@ swift format lint --recursive Sources Tests Package.swift
 - 只有保守关键词本地检索和模型辅助归纳，没有向量数据库、真实语义评测或跨设备同步。Jev 对长批次目前最多评估八条，超出的批次保留人工复核。
 
 详细状态与证据见 `IMPLEMENTATION_STATUS.md`。不把接口实现、模拟测试与真实服务验证混作同一状态。
+
+## 隔离界面检查
+
+构建后可用 `open dist/MemoriaRebuild.app --args --review-session` 打开隔离的测试资料库和偏好设置；使用前退出普通应用。测试资料位于系统临时目录的 `memoria-review-session`，不访问正常资料库。退出测试后正常双击应用即可回到个人数据。
+
+本轮通过 AX 实际操作了语言切换、导入选择、跨页保留、手动确认、英文检索和来源、人物澄清、整理错误、提案转行程。截图接口只返回约 160px 失真缩略图，因此完整像素布局与动效视觉验收仍未完成；不能把设计源码评分当成完整实机验收。

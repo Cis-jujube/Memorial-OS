@@ -1,0 +1,55 @@
+Window: "Memoria", App: Memoria.
+0 standard window Memoria, ID: main, Secondary Actions: Raise
+	1 container
+		2 text Record saved
+		3 button OK
+		4 text Memoria Remember with care.
+		5 button Capture
+		6 button Review desk
+		7 button Ask
+		8 button People
+		9 button Outings
+		10 button (selected) Import
+		11 button Settings
+		12 Language / 语言
+			13 radio button Description: 中文, Value: 0
+			14 radio button Description: English, Value: 1
+		15 text Your memories, your space Capture, then confirm.
+Keep what matters.
+		16 scroll area Secondary Actions: Scroll Up, Scroll Down
+			17 text Bring the little things with you Paste WeChat chat text or open a text file. Preview and choose what to keep. Import stays local and does not run AI. Chat text
+			18 button Open text file
+			19 scroll area Secondary Actions: Scroll Up, Scroll Down
+				20 text entry area (settable) Description: Chat text to import, Value: TEST draft one
+
+TEST draft two
+				21 scroll bar (disabled, settable, float) 0
+			22 text UTF-8 / UTF-16 TXT or Markdown, up to 2 MB. Names, timestamps and message order remain in the text; speakers are not inferred. WeChat backup databases are not supported.
+			23 toggle button Description: Split at blank lines (off keeps one record), On, Value: on
+			24 pop up button Associate a person (optional), Value: Me / unassigned
+			25 button Preview import
+			26 text Choose excerpts to save · 1 / 2
+			27 button Select all
+			28 button Clear selection
+			29 text Previously imported excerpts for this person are skipped, including deleted imports. Identical excerpts within this preview appear once.
+			30 button Import selected excerpts
+			31 list Secondary Actions: AXScrollToTop, AXScrollToBottom
+			32 scroll bar (settable, float) 0
+				33 value indicator (settable, float) 0
+				34 increment arrow button
+				35 decrement arrow button
+				36 increment page button
+				37 decrement page button
+	38 close button
+	39 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	40 minimize button
+	41 text Memoria
+42 menu bar
+	43 Memoria Rebuild
+	44 File
+	45 Edit
+	46 View
+	47 Window
+	48 Help
+
+The focused UI element is 0 standard window Memoria, ID: main, Secondary Actions: Raise
